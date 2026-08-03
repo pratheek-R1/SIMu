@@ -38,7 +38,8 @@ export default function Committee() {
       );
       setAnswer("");
       if (r.complete) {
-        await api.post(`/sessions/${sessionId}/deliberation/start`);
+        // Deliberation is started server-side when the last answer is saved,
+        // so we only need to refresh state and navigate.
         await refreshState();
         await go("deliberation");
       } else {

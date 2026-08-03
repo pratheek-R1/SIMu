@@ -108,10 +108,23 @@ async def answer(body: CommitteeAnswerRequest, run: OwnedSession, db: Db) -> dic
     if "missing_data" in analysis["signals"]:
         await record_event(db, run, "provenance_query", subject="committee")
 
+    complete = len(answers) >= N_PARTNERS
+
+    # Start deliberation in the same transaction so the frontend never hits a
+    # state where all answers are committed but deliberation has not started.
+    if complete and run.deliberation_started_at is None:
+        run.deliberation_started_at = now()
+        db.add(run)
+
+    # Flush so the commit in get_db() sees the full mutation before the
+    # response is sent. This prevents a race where a immediately following
+    # /deliberation/start request loads the row before the write lands.
+    await db.flush()
+
     return {
         "answered": len(answers),
         "total": N_PARTNERS,
-        "complete": len(answers) >= N_PARTNERS,
+        "complete": complete,
     }
 
 
