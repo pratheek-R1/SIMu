@@ -18,6 +18,17 @@ log = logging.getLogger("survivors")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Fail at boot rather than issuing tokens anyone can forge. Render's
+    # blueprint generates the secret, so this only fires on a misconfigured
+    # manual deploy.
+    if settings.is_production and settings.jwt_secret == "dev-secret-change-me":
+        raise RuntimeError("JWT_SECRET must be set when ENVIRONMENT=production")
+    if settings.is_production and settings.is_sqlite:
+        log.warning(
+            "running against SQLite in production: Render's disk is ephemeral "
+            "and all student sessions are lost on redeploy. Set DATABASE_URL."
+        )
+
     await init_db()
 
     # Build the default dataset at boot so the first student does not pay for

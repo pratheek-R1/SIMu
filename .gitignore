@@ -1,20 +1,39 @@
-# ── Node / Frontend ──────────────────────────────────────────
-frontend/node_modules/
-frontend/.next/
-frontend/.env.local
-frontend/.env*.local
-
 # ── Python / Backend ─────────────────────────────────────────
-backend/__pycache__/
-backend/**/__pycache__/
-backend/*.pyc
-backend/.env
-backend/.env.railway
-backend/survivors.db
-backend/survivors.db-shm
-backend/survivors.db-wal
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
 backend/.venv/
-backend/venv/
+
+# ── Environment variables ────────────────────────────────────
+.env
+*.env
+.env.local
+.env.*.local
+backend/.env.railway
+!.env.example
+!.env.local.example
+
+# ── Databases ────────────────────────────────────────────────
+# Covers survivors.db, dev.db and test_playthrough.db along with the
+# SQLite sidecar files a WAL-mode connection leaves behind.
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
+
+# ── Node / Frontend ──────────────────────────────────────────
+node_modules/
+
+# Next.js build output -- Render rebuilds this on every deploy; committing it
+# bloats the repo and lets a stale bundle win over a fresh build.
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
 
 # ── OS / Editor ──────────────────────────────────────────────
 .DS_Store

@@ -1,0 +1,108 @@
+# Render blueprint -- provisions the whole stack from this repo.
+#
+#   Render Dashboard -> New -> Blueprint -> pick this repo.
+#
+# Everything below is on the free tier so a cohort can be stood up without a
+# card. Read DEPLOY.md before a real teaching deployment: free Postgres is
+# deleted after 30 days and free web services sleep after 15 minutes idle.
+
+databases:
+  - name: survivors-db
+    databaseName: survivors
+    user: survivors
+    plan: free
+
+services:
+  # ---------------------------------------------------------------------------
+  # FastAPI -- owns the dataset, the scoring and every piece of ground truth.
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: survivors-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    # Boot builds the default cohort dataset and runs the validation gate, so
+    # give the health check room; $PORT is assigned by Render.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers ${WEB_CONCURRENCY:-1}
+    healthCheckPath: /api/v1/meta/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: ENVIRONMENT
+        value: production
+      # One worker fits the free instance's 512 MB alongside the generated
+      # dataset. Raise this only after moving to a paid plan.
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRE_MINUTES
+        value: "720"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: survivors-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: survivors-cache
+          property: connectionString
+      - key: CACHE_TTL_SECONDS
+        value: "3600"
+      # Render hands back a bare hostname; config.py prefixes it with https://.
+      - key: CORS_ORIGINS
+        fromService:
+          type: web
+          name: survivors-web
+          property: host
+      - key: INR_RATE
+        value: "83"
+      - key: DELIBERATION_SECONDS
+        value: "15"
+      # Give every teaching cohort its own seed -- reusing one across semesters
+      # means the reveal is common knowledge before the second intake.
+      - key: DEFAULT_COHORT_SEED
+        value: "20260729"
+      # Optional Supabase Storage for report HTML. Reports are also persisted to
+      # Postgres, so leaving these blank degrades gracefully.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_REPORT_BUCKET
+        value: reports
+
+  # ---------------------------------------------------------------------------
+  # Next.js terminal UI.
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: survivors-web
+    runtime: node
+    plan: free
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: "22.11.0"
+      # NEXT_PUBLIC_API_URL is inlined at build time by next.config.mjs, which
+      # turns this bare host into an https:// origin.
+      - key: NEXT_PUBLIC_API_HOST
+        fromService:
+          type: web
+          name: survivors-api
+          property: host
+
+  # ---------------------------------------------------------------------------
+  # Cache. Values are all derived from the cohort seed and immutable for its
+  # lifetime; without this the API falls back to a per-process dict, which is
+  # correct for one worker and wrong for several.
+  # ---------------------------------------------------------------------------
+  - type: keyvalue
+    name: survivors-cache
+    plan: free
+    ipAllowList: []  # private network only
+    maxmemoryPolicy: allkeys-lru
