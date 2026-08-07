@@ -56,6 +56,9 @@ service's hostname (a bare host is fine — the API assumes `https://`).
   the dev default, rather than issuing forgeable tokens.
 - **`.next/` and `.env.local` are untracked.** A committed build output would
   have shipped a stale bundle pointing at `localhost:8000`.
+- **Supabase is gone.** Report HTML is stored in Postgres only, which is where
+  the facilitator endpoints already read it from; there is no object store to
+  drift out of sync and no service-role key to leak.
 
 ## Free-tier caveats
 
@@ -72,8 +75,8 @@ Read these before putting a cohort in front of it.
 
 ## Environment variables
 
-`render.yaml` sets everything below except the two marked *manual*. Full
-descriptions live in [`backend/.env.example`](backend/.env.example).
+`render.yaml` sets all of these. Full descriptions live in
+[`backend/.env.example`](backend/.env.example).
 
 | Variable                            | Notes                                     |
 | ----------------------------------- | ----------------------------------------- |
@@ -84,7 +87,6 @@ descriptions live in [`backend/.env.example`](backend/.env.example).
 | `ENVIRONMENT`                       | `production`.                              |
 | `DEFAULT_COHORT_SEED`               | **Change per cohort.** See below.          |
 | `INR_RATE`, `DELIBERATION_SECONDS`  | Tuning.                                    |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | *Manual*, optional. Report HTML is also persisted to Postgres, so leaving these blank loses nothing. |
 | `NEXT_PUBLIC_API_HOST`              | From the `survivors-api` host. Baked in at **build** time — changing it needs a rebuild, not a restart. |
 
 ### Per-cohort seeds

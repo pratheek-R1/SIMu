@@ -15,7 +15,8 @@ class Base(DeclarativeBase):
 def _connect_args() -> dict:
     if settings.is_sqlite:
         return {}
-    # Supabase's pooler does not support prepared statement caching.
+    # Connection poolers in front of Postgres do not support prepared statement
+    # caching; disabling it costs little and works everywhere.
     args: dict = {"statement_cache_size": 0}
     if settings.db_ssl_required:
         # asyncpg takes TLS through connect_args; `sslmode` in the DSN is a
@@ -54,8 +55,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     """Create tables if absent.
 
-    Production uses the checked-in schema.sql against Supabase; this exists so a
-    developer can run the API against SQLite with no setup at all.
+    This is what provisions the schema on Render -- the first boot against an
+    empty Postgres creates every table. schema.sql remains the reference for
+    setting a database up by hand.
     """
     from . import models  # noqa: F401  -- registers mappers
 

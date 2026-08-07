@@ -7,14 +7,12 @@ import { useStore } from "@/lib/store";
 export default function Report() {
   const { sessionId, toast } = useStore();
   const [html, setHtml] = useState<string | null>(null);
-  const [publicUrl, setPublicUrl] = useState<string | null>(null);
-  const [stored, setStored] = useState(false);
 
   useEffect(() => {
     if (!sessionId) return;
     api
-      .post<{ html: string; public_url: string | null; stored: boolean }>(`/sessions/${sessionId}/report`)
-      .then((r) => { setHtml(r.html); setPublicUrl(r.public_url); setStored(r.stored); })
+      .post<{ html: string; stored: boolean }>(`/sessions/${sessionId}/report`)
+      .then((r) => setHtml(r.html))
       .catch(() => toast("Report failed", "Could not generate the report. Try again."));
   }, [sessionId, toast]);
 
@@ -38,23 +36,12 @@ export default function Report() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={download} disabled={!html}>Download</button>
-          {publicUrl && (
-            <a href={publicUrl} target="_blank" rel="noreferrer">
-              <button>Open stored copy</button>
-            </a>
-          )}
         </div>
       </div>
 
-      {stored ? (
-        <p className="note" style={{ marginBottom: 12 }}>
-          Saved to object storage and to your session record. Your facilitator can retrieve it.
-        </p>
-      ) : (
-        <p className="note" style={{ marginBottom: 12 }}>
-          Saved to your session record.
-        </p>
-      )}
+      <p className="note" style={{ marginBottom: 12 }}>
+        Saved to your session record. Your facilitator can retrieve it.
+      </p>
 
       {html ? (
         <iframe

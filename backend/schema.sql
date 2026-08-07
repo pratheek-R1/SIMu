@@ -1,14 +1,15 @@
--- Supabase PostgreSQL schema.
+-- PostgreSQL schema.
 --
--- The API can create these itself via SQLAlchemy metadata, but running this by
--- hand is preferable in production: it makes the shape of the data reviewable,
--- and it adds the indexes and RLS posture that create_all does not.
+-- On Render the API creates these itself at first boot via SQLAlchemy metadata.
+-- Running this by hand is still preferable when provisioning a database
+-- yourself: it makes the shape of the data reviewable, and it adds the indexes
+-- and RLS posture that create_all does not.
 --
--- Row Level Security is enabled and left with NO permissive policies. All
--- access goes through the FastAPI service using the service-role key, which
--- bypasses RLS. That is deliberate: the anon key must never be able to read a
--- session, because session rows carry thesis and telemetry data that determine
--- a student's grade.
+-- Row Level Security is enabled and left with NO permissive policies. The API
+-- connects as the owning role, which bypasses RLS; anything else added later
+-- gets no access until a policy is written for it. Session rows carry thesis
+-- and telemetry data that determine a student's grade, so the default must be
+-- deny.
 
 create extension if not exists "uuid-ossp";
 
@@ -107,8 +108,6 @@ create table if not exists scorecards (
 create table if not exists reports (
     id            uuid primary key default uuid_generate_v4(),
     session_id    uuid not null references sessions(id) on delete cascade,
-    storage_path  text,
-    public_url    text,
     content_html  text,
     created_at    timestamptz not null default now()
 );
@@ -122,6 +121,6 @@ alter table telemetry_events enable row level security;
 alter table scorecards       enable row level security;
 alter table reports          enable row level security;
 
--- No policies are defined on purpose. Reads and writes go through the API with
--- the service-role key. If you later expose Supabase directly to the browser,
--- add policies before doing so -- not after.
+-- No policies are defined on purpose. Reads and writes go through the API. If
+-- you ever grant another role direct access to this database, write its
+-- policies before doing so -- not after.

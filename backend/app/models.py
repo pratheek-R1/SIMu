@@ -194,7 +194,5 @@ class Report(Base):
     session_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("sessions.id", ondelete="CASCADE"), index=True
     )
-    storage_path: Mapped[str | None] = mapped_column(Text, nullable=True)
-    public_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     content_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

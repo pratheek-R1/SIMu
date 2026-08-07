@@ -11,7 +11,6 @@ from ..scoring import build_scorecard
 from ..service import now
 from ..sim import parameters as P
 from ..sim import portfolio as mc
-from ..storage import upload_report
 from ..config import settings
 
 router = APIRouter(prefix="/sessions/{session_id}", tags=["results"])
@@ -157,28 +156,16 @@ async def create_report(run: OwnedSession, db: Db) -> dict:
         rate=settings.inr_rate,
     )
 
-    path, public_url = await upload_report(run.id, html)
-
+    # Postgres is the only store. The report is the artefact a facilitator
+    # grades from, so it lives with the session it came from rather than in a
+    # separate object store that can drift out of sync with it.
     existing = (
         await db.execute(select(Report).where(Report.session_id == run.id))
     ).scalar_one_or_none()
     if existing:
-        existing.storage_path = path
-        existing.public_url = public_url
         existing.content_html = html
         db.add(existing)
     else:
-        db.add(
-            Report(
-                session_id=run.id,
-                storage_path=path,
-                public_url=public_url,
-                content_html=html,
-            )
-        )
+        db.add(Report(session_id=run.id, content_html=html))
 
-    return {
-        "html": html,
-        "public_url": public_url,
-        "stored": path is not None,
-    }
+    return {"html": html, "stored": True}

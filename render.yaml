@@ -65,14 +65,6 @@ services:
       # means the reveal is common knowledge before the second intake.
       - key: DEFAULT_COHORT_SEED
         value: "20260729"
-      # Optional Supabase Storage for report HTML. Reports are also persisted to
-      # Postgres, so leaving these blank degrades gracefully.
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_KEY
-        sync: false
-      - key: SUPABASE_REPORT_BUCKET
-        value: reports
 
   # ---------------------------------------------------------------------------
   # Next.js terminal UI.

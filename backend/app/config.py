@@ -5,7 +5,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Managed Postgres providers (Render, Heroku, Supabase) hand out libpq URLs:
+# Managed Postgres providers hand out libpq URLs:
 # a `postgresql://` scheme plus query parameters asyncpg does not understand.
 # Rewriting them here means DATABASE_URL can be pasted in verbatim.
 _LIBPQ_ONLY_PARAMS = {"sslmode", "channel_binding", "target_session_attrs", "gssencmode"}
@@ -37,23 +37,16 @@ class Settings(BaseSettings):
     environment: str = "development"
     api_prefix: str = "/api/v1"
 
-    # Postgres. On Render use the blueprint-injected connection string; on
-    # Supabase use the session-pooler URL (port 5432) -- asyncpg does not speak
-    # the transaction pooler's protocol for prepared statements. Either form is
-    # accepted verbatim: `sqlalchemy_database_url` normalises the driver and
-    # strips libpq-only query parameters.
+    # Postgres. On Render this is the blueprint-injected connection string. Any
+    # provider's URL is accepted verbatim: `sqlalchemy_database_url` normalises
+    # the driver and strips libpq-only query parameters.
     database_url: str = "sqlite+aiosqlite:///./survivors.db"
 
-    # Upstash Redis (rediss://). Optional: the API degrades to an in-process
+    # Render Key Value / Redis. Optional: the API degrades to an in-process
     # cache when unset, which is correct for a single-worker dev run and wrong
     # for a multi-replica deployment.
     redis_url: str | None = None
     cache_ttl_seconds: int = 3600
-
-    # Supabase Storage
-    supabase_url: str | None = None
-    supabase_service_key: str | None = None
-    supabase_report_bucket: str = "reports"
 
     jwt_secret: str = "dev-secret-change-me"
     jwt_algorithm: str = "HS256"
