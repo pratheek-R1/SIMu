@@ -34,8 +34,8 @@ export default function Scorecard() {
         <div>
           <div className="eyebrow" style={{ marginBottom: 4 }}>Total</div>
           <div className="count" style={{ fontSize: 44 }}>
-            {card.total}
-            <span style={{ fontSize: 18, color: "var(--ink-4)" }}> / {card.max}</span>
+            {card.myelin.total}
+            <span style={{ fontSize: 18, color: "var(--ink-4)" }}> / {card.myelin.max}</span>
           </div>
         </div>
         <div>
@@ -44,12 +44,58 @@ export default function Scorecard() {
             className="tag"
             style={{ background: "rgba(232,115,42,.1)", color: "var(--orange)", fontSize: 14, padding: "6px 14px" }}
           >
-            {card.band}
+            {card.myelin.band}
           </div>
         </div>
       </div>
 
       <div className="card pad" style={{ marginBottom: 16 }}>
+        {card.myelin.dimensions.map((d) => (
+          <div className="dim" key={d.key}>
+            <div className="dim-head">
+              <span className="dim-label">{d.label}</span>
+              <span className="dim-score">{d.score} / {d.max}</span>
+            </div>
+            <div className={`bar${d.score >= d.max ? " full" : ""}`}>
+              <div style={{ width: `${Math.min(100, (d.score / d.max) * 100)}%` }} />
+            </div>
+            <p className="note" style={{ lineHeight: 1.6 }}>{d.detail}</p>
+          </div>
+        ))}
+
+        {card.myelin.not_applicable.map((d) => (
+          <div className="dim" key={d.key} style={{ opacity: 0.62 }}>
+            <div className="dim-head">
+              <span className="dim-label">{d.label}</span>
+              <span className="dim-score" style={{ color: "var(--ink-4)" }}>N/A</span>
+            </div>
+            <div className="bar" aria-hidden>
+              <div style={{ width: 0 }} />
+            </div>
+            <p className="note" style={{ lineHeight: 1.6 }}>{d.detail}</p>
+          </div>
+        ))}
+
+        <p className="note" style={{ lineHeight: 1.6, marginTop: 4 }}>
+          Those two are not scored zero — they are not scored at all. Nothing you do in
+          this simulation produces evidence about them, and a number invented to fill the
+          gap would measure appearance rather than behaviour.
+        </p>
+      </div>
+
+      <div className="card pad" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+          <div className="eyebrow" style={{ marginBottom: 0 }}>Process detail</div>
+          <span className="mono" style={{ fontSize: 12.5 }}>
+            {card.total}
+            <span style={{ color: "var(--ink-4)" }}> / {card.max} · {card.band}</span>
+          </span>
+        </div>
+        <p className="note" style={{ lineHeight: 1.6, marginBottom: 14 }}>
+          The finer-grained diagnostic this simulation scores itself on. Several of these
+          feed the dimensions above — Adaptability is Revision Quality on a different
+          scale, not a second opinion about it.
+        </p>
         {card.dimensions.map((d) => (
           <div className="dim" key={d.key}>
             <div className="dim-head">

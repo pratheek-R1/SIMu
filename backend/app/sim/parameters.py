@@ -56,6 +56,35 @@ WIN_MULTIPLE = 4.5  # a win returns 4.5x the cheque
 LOSS_MULTIPLE = 0.15  # a write-off returns 15% of the cheque
 
 # --------------------------------------------------------------------------
+# Capital allocation
+# --------------------------------------------------------------------------
+# The student sizes five cheques themselves out of one fixed pool rather than
+# writing five identical ones. Without this, Capital Allocation has nothing to
+# measure -- five equal cheques express no conviction ordering at all -- and the
+# Risk Management concentration term is constant for every student.
+#
+# All amounts are WHOLE USD held as ints. The handoff's Part 5 warns that a
+# rounding error here silently corrupts both the capital and risk dimensions;
+# integer cents-free arithmetic plus an exact-equality check on the total is the
+# cheapest way to make that class of bug impossible rather than unlikely.
+FUND_POOL_USD = int(CHEQUE_USD) * N_CHEQUES  # 50M USD == Rs 415 Cr
+
+# Sizing granularity. 1M USD steps give 50 units to distribute across 5 cheques
+# -- coarse enough to slide without fiddling, fine enough to express a real
+# ordering.
+CHEQUE_STEP_USD = 1_000_000
+
+# Every pick must actually be funded: a zero cheque is a pick the student did
+# not make. The ceiling stops the whole fund landing on one company, which the
+# Risk Management dimension would score at zero anyway.
+CHEQUE_MIN_USD = 2_000_000
+CHEQUE_MAX_USD = 30_000_000
+
+# Concentration above this share of the fund starts costing Risk Management
+# points. Below it, no penalty.
+CONCENTRATION_FREE_SHARE = 0.30
+
+# --------------------------------------------------------------------------
 # Binary features
 # --------------------------------------------------------------------------
 # Tuple format: (P(feature | succeeds), P(feature | fails), class)

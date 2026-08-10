@@ -192,9 +192,21 @@ def _true_strength(lift: float) -> float:
 # --------------------------------------------------------------------------
 # Dimensions
 # --------------------------------------------------------------------------
+# Chart engagement is the one signal the client self-reports (the server cannot
+# observe a hover), and it is the cheapest of the three to produce. Capping its
+# contribution stops it standing in for research it does not evidence: a live
+# session scored 18.0/20 here from nine chart hovers with zero profiles opened
+# and zero comparisons built, which is not what this dimension claims to measure.
+CHART_POINTS_CAP = 8.0
+
+
 def evidence_depth(t: Telemetry) -> dict[str, Any]:
-    raw = len(t.profiles) * 0.6 + t.comparisons * 4 + len(t.charts) * 2
-    score = min(20.0, round(raw, 1))
+    profile_points = len(t.profiles) * 0.6
+    comparison_points = t.comparisons * 4
+    chart_points = min(CHART_POINTS_CAP, len(t.charts) * 2)
+    score = min(20.0, round(profile_points + comparison_points + chart_points, 1))
+
+    capped = len(t.charts) * 2 > CHART_POINTS_CAP
     return {
         "key": "evidence_depth",
         "label": "Evidence Depth",
@@ -203,11 +215,18 @@ def evidence_depth(t: Telemetry) -> dict[str, Any]:
         "detail": (
             f"{len(t.profiles)} profiles opened, {t.comparisons} comparisons built, "
             f"{len(t.charts)} distinct charts engaged with."
+            + (
+                f" Chart engagement is capped at {CHART_POINTS_CAP:g} of the 20 points; "
+                "reading companies and building comparisons carries the rest."
+                if capped
+                else ""
+            )
         ),
         "components": {
             "profiles": len(t.profiles),
             "comparisons": t.comparisons,
             "charts": len(t.charts),
+            "chart_points_capped": capped,
         },
     }
 
@@ -423,20 +442,317 @@ def decision_discipline(
 
 
 # --------------------------------------------------------------------------
+# Myelin standard scorecard
+# --------------------------------------------------------------------------
+# The platform-wide rubric, scored out of 100 from the same session the
+# process-detail dimensions above are scored from. Two of the seven standard
+# dimensions have no mechanic in this simulation and are reported N/A rather
+# than given a fabricated number -- see `NOT_APPLICABLE` below.
+#
+# Three of these five (Strategic Thinking, Long-Term Value, Adaptability) read
+# the same weight vector as each other and as Revision Quality. They ask
+# genuinely different questions of it -- final-state coherence, final-state
+# durability, and correctness of the change over time -- but they are
+# correlated, not independent, and should not be presented as orthogonal axes.
+
+
+def strategic_thinking(ds: Dataset, weights: dict[str, float] | None) -> dict[str, Any]:
+    """Does the final model hold one coherent, evidence-aligned view?
+
+    Every non-zero weight is checked against the direction of true lift. A model
+    that rewards a variable which predicts failure contradicts itself, and the
+    contradiction costs in proportion to how much conviction sits on it.
+    """
+    weights = weights or {}
+    agreeing = total = 0.0
+    conflicts = []
+    for key in P.FEATURE_KEYS:
+        w = float(weights.get(key, 0.0))
+        if not w:
+            continue
+        lift = _lift(ds, key)
+        total += abs(w)
+        if (w > 0) == (lift > 1.0):
+            agreeing += abs(w)
+        else:
+            conflicts.append(
+                {
+                    "feature": key,
+                    "label": P.FEATURE_LABELS[key],
+                    "weight": round(w, 2),
+                    "true_lift": round(lift, 2),
+                }
+            )
+
+    ratio = agreeing / total if total else 0.0
+    score = round(20.0 * ratio, 1)
+    return {
+        "key": "strategic_thinking",
+        "label": "Strategic Thinking",
+        "score": score,
+        "max": 20,
+        "detail": (
+            f"{round(ratio * 100)}% of the conviction in your final model points the "
+            "same way the evidence does."
+            + (
+                f" {len(conflicts)} variable{'s' if len(conflicts) != 1 else ''} "
+                "carried weight against the evidence."
+                if conflicts
+                else ""
+            )
+            if total
+            else "No weights were set, so the model states no view to be coherent about."
+        ),
+        "components": {"aligned_weight": round(agreeing, 2), "total_weight": round(total, 2), "conflicts": conflicts},
+    }
+
+
+def capital_allocation(
+    ds: Dataset,
+    picks: list[int] | None,
+    weights: dict[str, float] | None,
+    cheque_sizes: dict[str, int] | None,
+) -> dict[str, Any]:
+    """Did more capital go behind the picks the student's own model rated highest?
+
+    A concordance over every pair of picks. Ties on either axis leave the pair
+    out of the denominator, so a student who sized every cheque identically
+    expressed no ordering and scores a neutral 0.5 -- neither rewarded nor
+    punished for information they never gave.
+    """
+    picks = picks or []
+    weights = weights or {}
+    sizes = cheque_sizes or {}
+    by_id = {d["id"]: d for d in ds.deals}
+
+    if len(picks) < 2:
+        return {
+            "key": "capital_allocation",
+            "label": "Capital Allocation",
+            "score": 10.0,
+            "max": 20,
+            "detail": "Too few cheques to compare sizing against conviction.",
+            "components": {"pairs": 0, "concordant": 0, "neutral": True},
+        }
+
+    scored = [
+        (
+            model_score(by_id[p]["flags"], weights) if p in by_id else 0.0,
+            float(sizes.get(str(p), 0)),
+        )
+        for p in picks
+    ]
+
+    concordant = pairs = 0
+    for a in range(len(scored)):
+        for b in range(a + 1, len(scored)):
+            score_delta = scored[a][0] - scored[b][0]
+            size_delta = scored[a][1] - scored[b][1]
+            if score_delta == 0 or size_delta == 0:
+                continue
+            pairs += 1
+            if (score_delta > 0) == (size_delta > 0):
+                concordant += 1
+
+    neutral = pairs == 0
+    ratio = 0.5 if neutral else concordant / pairs
+    score = round(20.0 * ratio, 1)
+
+    return {
+        "key": "capital_allocation",
+        "label": "Capital Allocation",
+        "score": score,
+        "max": 20,
+        "detail": (
+            "Every cheque was the same size, so the allocation expressed no ranking. "
+            "Scored neutrally rather than as a mistake."
+            if neutral
+            else f"{concordant} of {pairs} pairs of picks were sized in the same order "
+            "your model ranked them."
+        ),
+        "components": {"pairs": pairs, "concordant": concordant, "neutral": neutral},
+    }
+
+
+def risk_management(
+    ds: Dataset, picks: list[int] | None, cheque_sizes: dict[str, int] | None
+) -> dict[str, Any]:
+    """Is the portfolio diversified, or one correlated bet in five envelopes?"""
+    picks = picks or []
+    sizes = cheque_sizes or {}
+    by_id = {d["id"]: d for d in ds.deals}
+
+    if not picks:
+        return {
+            "key": "risk_management",
+            "label": "Risk Management",
+            "score": 0.0,
+            "max": 15,
+            "detail": "No cheques were written.",
+            "components": {},
+        }
+
+    sectors = {by_id[p]["sector"] for p in picks if p in by_id}
+    diversity = len(sectors) / max(1, len(picks))
+
+    total = sum(sizes.values()) or P.FUND_POOL_USD
+    max_share = max((sizes.get(str(p), 0) for p in picks), default=0) / total
+    free = P.CONCENTRATION_FREE_SHARE
+    penalty = max(0.0, min(1.0, (max_share - free) / (1.0 - free)))
+
+    score = round(15.0 * (0.5 * diversity + 0.5 * (1.0 - penalty)), 1)
+
+    return {
+        "key": "risk_management",
+        "label": "Risk Management",
+        "score": score,
+        "max": 15,
+        "detail": (
+            f"{len(sectors)} distinct sector{'s' if len(sectors) != 1 else ''} across "
+            f"{len(picks)} positions; largest single position is {round(max_share * 100)}% "
+            f"of the fund."
+            + (
+                f" Concentration above {round(free * 100)}% costs points."
+                if penalty > 0
+                else ""
+            )
+        ),
+        "components": {
+            "sectors": sorted(sectors),
+            "diversity": round(diversity, 3),
+            "max_share": round(max_share, 4),
+            "concentration_penalty": round(penalty, 3),
+        },
+    }
+
+
+def adaptability(revision: dict[str, Any]) -> dict[str, Any]:
+    """The same measurement as Revision Quality, on the standard rubric's scale.
+
+    Deliberately not recomputed: two dimensions that claim to measure the same
+    behaviour must not be able to drift apart.
+    """
+    score = round(revision["score"] * (25.0 / 15.0), 1)
+    return {
+        "key": "adaptability",
+        "label": "Adaptability",
+        "score": score,
+        "max": 25,
+        "detail": revision["detail"],
+        "components": {**revision["components"], "rescaled_from": "revision_quality"},
+    }
+
+
+def long_term_value(ds: Dataset, weights: dict[str, float] | None) -> dict[str, Any]:
+    """Does conviction sit on durable causal signal, or on variables that merely
+    look strong once the failures are hidden?"""
+    weights = weights or {}
+    causal_weight = total = 0.0
+    for key in P.FEATURE_KEYS:
+        w = float(weights.get(key, 0.0))
+        if not w:
+            continue
+        total += abs(w)
+        if key in P.CAUSAL_FEATURES and w > 0:
+            causal_weight += w
+
+    ratio = causal_weight / total if total else 0.0
+    score = round(20.0 * ratio, 1)
+    return {
+        "key": "long_term_value",
+        "label": "Long-Term Value Creation",
+        "score": score,
+        "max": 20,
+        "detail": (
+            f"{round(ratio * 100)}% of your total conviction sits on the "
+            f"{len(P.CAUSAL_FEATURES)} variables that genuinely predict success."
+            if total
+            else "No weights were set."
+        ),
+        "components": {
+            "causal_weight": round(causal_weight, 2),
+            "total_weight": round(total, 2),
+        },
+    }
+
+
+# Reported as explicit N/A cards. Forcing a number for a dimension with no
+# underlying mechanic would score appearance rather than behaviour -- the exact
+# failure this engine exists to avoid. A platform dashboard aggregating across
+# simulations should source these from one that actually tests them.
+NOT_APPLICABLE = [
+    {
+        "key": "systems_thinking",
+        "label": "Systems Thinking",
+        "score": None,
+        "max": None,
+        "detail": (
+            "This simulation is a single-analyst research exercise -- no decision "
+            "here has cross-functional or organisational ripple effects to observe. "
+            "Not testable on this simulation; would require a scenario built around "
+            "organisational interdependency."
+        ),
+    },
+    {
+        "key": "leadership",
+        "label": "Leadership & People Management",
+        "score": None,
+        "max": None,
+        "detail": (
+            "You never manage, hire, or delegate to anyone in this simulation. Not "
+            "testable here -- reserved for a simulation built around team leadership."
+        ),
+    },
+]
+
+
+def build_myelin(
+    ds: Dataset, session: Any, revision: dict[str, Any]
+) -> dict[str, Any]:
+    weights = session.model_weights
+    dimensions = [
+        strategic_thinking(ds, weights),
+        capital_allocation(ds, session.picks, weights, session.cheque_sizes),
+        risk_management(ds, session.picks, session.cheque_sizes),
+        adaptability(revision),
+        long_term_value(ds, weights),
+    ]
+    total = round(sum(d["score"] for d in dimensions), 1)
+    return {
+        "dimensions": dimensions,
+        "not_applicable": NOT_APPLICABLE,
+        "total": total,
+        "max": sum(d["max"] for d in dimensions),
+        "band": band_for(total),
+    }
+
+
+# --------------------------------------------------------------------------
 # Fund result (zero weight, displayed anyway)
 # --------------------------------------------------------------------------
-def resolve_fund(ds: Dataset, picks: list[int]) -> dict[str, Any]:
-    cheque = P.CHEQUE_USD
-    rows, returned, wins = [], 0.0, 0
+def resolve_fund(
+    ds: Dataset, picks: list[int], cheque_sizes: dict[str, int] | None = None
+) -> dict[str, Any]:
+    """Settle the fund at the student's own cheque sizes.
+
+    Sizing matters to the P&L as well as to the score: backing a conviction
+    heavily and being right returns more than spreading evenly. That P&L is
+    still worth zero points -- but it has to be arithmetically honest, or the
+    results screen contradicts the allocation the student just made.
+    """
+    sizes = cheque_sizes or {}
+    rows, returned, wins, deployed = [], 0.0, 0, 0.0
     by_id = {d["id"]: d for d in ds.deals}
 
     for pid in picks:
         deal = by_id.get(pid)
         if deal is None:
             continue
+        cheque = float(sizes.get(str(pid), P.CHEQUE_USD))
         won = deal["outcome"] == 1
         value = cheque * (P.WIN_MULTIPLE if won else P.LOSS_MULTIPLE)
         returned += value
+        deployed += cheque
         wins += int(won)
         rows.append(
             {
@@ -444,12 +760,12 @@ def resolve_fund(ds: Dataset, picks: list[int]) -> dict[str, Any]:
                 "name": deal["name"],
                 "sector": deal["sector"],
                 "cheque_usd": cheque,
+                "share_of_fund": round(cheque / P.FUND_POOL_USD, 4),
                 "outcome": "Success" if won else "Write-off",
                 "returned_usd": value,
             }
         )
 
-    deployed = cheque * len(rows)
     missed = [
         {"id": d["id"], "name": d["name"], "sector": d["sector"]}
         for d in ds.deals
@@ -507,12 +823,13 @@ def build_scorecard(ds: Dataset, session: Any, events: Iterable[Any]) -> dict[st
     variables = session.thesis_variables or []
     confidence = session.thesis_confidence or {}
 
+    revision = revision_quality(ds, session.w1_snapshot, session.model_weights)
     dimensions = [
         evidence_depth(t),
         provenance(t, committee),
         triangulation(t),
         calibration(ds, variables, confidence),
-        revision_quality(ds, session.w1_snapshot, session.model_weights),
+        revision,
         decision_discipline(ds, session.picks, session.model_weights),
     ]
 
@@ -523,6 +840,10 @@ def build_scorecard(ds: Dataset, session: Any, events: Iterable[Any]) -> dict[st
         "total": total,
         "max": sum(d["max"] for d in dimensions),
         "band": band_for(total),
+        # The platform-wide rubric, from the same session. Adaptability is the
+        # rescaled Revision Quality object above rather than a second
+        # computation of it.
+        "myelin": build_myelin(ds, session, revision),
         "committee_analysis": committee,
         "fund": session.fund_result,
         "telemetry": {

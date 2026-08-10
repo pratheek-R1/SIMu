@@ -120,6 +120,11 @@ class Session(Base):
 
     # ---- Deployment -----------------------------------------------------
     picks: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
+    # Cheque size per pick, in whole USD, keyed by deal id as a string because
+    # JSON object keys cannot be integers. Null means the student never sized
+    # them and the pool is split evenly -- which Capital Allocation reads as
+    # "no conviction expressed" and scores neutrally rather than as a failure.
+    cheque_sizes: Mapped[dict[str, int] | None] = mapped_column(JSON, nullable=True)
     deployed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     deployed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     fund_result: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
@@ -189,6 +194,10 @@ class Scorecard(Base):
 
 class Report(Base):
     __tablename__ = "reports"
+    # One report per session, like scorecards. Without this, a second POST to
+    # /report inserts a duplicate and every subsequent read raises
+    # MultipleResultsFound -- the student loses access to their own report.
+    __table_args__ = (UniqueConstraint("session_id", name="uq_report_session"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     session_id: Mapped[str] = mapped_column(

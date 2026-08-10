@@ -161,3 +161,7 @@ class BacktestResponse(BaseModel):
 # --------------------------------------------------------------------------
 class PicksRequest(BaseModel):
     picks: list[int] = Field(min_length=1, max_length=5)
+    # Cheque size per pick in whole USD, keyed by deal id as a string. Omitted
+    # while the student is still choosing companies; required to be complete and
+    # to total the pool exactly by the time they deploy.
+    cheque_sizes: dict[str, int] | None = None

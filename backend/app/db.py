@@ -52,8 +52,38 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             raise
 
 
+# Columns added to an existing table after the first release. `create_all`
+# creates absent TABLES and nothing else -- it will not add a column to a table
+# that already exists, so a database provisioned before one of these landed
+# comes up and then fails on the first query that selects it.
+#
+# Each entry is (table, column, DDL type). Adding a nullable column is safe to
+# replay, which is what keeps this idempotent rather than a migration history.
+_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    ("sessions", "cheque_sizes", "JSON"),
+)
+
+
+async def _add_missing_columns(conn) -> None:
+    from sqlalchemy import inspect, text
+
+    def _existing(sync_conn, table: str) -> set[str]:
+        inspector = inspect(sync_conn)
+        if table not in inspector.get_table_names():
+            return set()
+        return {c["name"] for c in inspector.get_columns(table)}
+
+    for table, column, ddl_type in _ADDED_COLUMNS:
+        columns = await conn.run_sync(_existing, table)
+        if not columns or column in columns:
+            continue
+        # Both SQLite and Postgres accept plain ADD COLUMN for a nullable
+        # column; only the type spelling differs, and JSON is common to both.
+        await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}"))
+
+
 async def init_db() -> None:
-    """Create tables if absent.
+    """Create tables if absent, then add any columns a later release introduced.
 
     This is what provisions the schema on Render -- the first boot against an
     empty Postgres creates every table. schema.sql remains the reference for
@@ -63,3 +93,4 @@ async def init_db() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _add_missing_columns(conn)

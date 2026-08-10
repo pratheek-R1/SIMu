@@ -12,6 +12,69 @@ from ..sim import parameters as P
 router = APIRouter(prefix="/sessions/{session_id}", tags=["dealflow"])
 
 
+def _even_split(picks: list[int]) -> dict[str, int]:
+    """Fallback allocation when the student never sized the cheques.
+
+    Kept exact: the remainder from an uneven division is handed to the first
+    cheques one step at a time rather than left to float, so the total is the
+    pool to the dollar.
+    """
+    if not picks:
+        return {}
+    base, remainder = divmod(P.FUND_POOL_USD, len(picks))
+    sizes = {str(pid): base for pid in picks}
+    for pid in picks[:remainder]:
+        sizes[str(pid)] += 1
+    return sizes
+
+
+def _validate_sizes(sizes: dict[str, int], picks: list[int], *, final: bool) -> None:
+    """Reject an allocation that would corrupt the capital or risk dimensions.
+
+    `final` is set once the student has all five picks and is about to deploy;
+    only then is the exact-total rule enforced, so partial sizing while they are
+    still choosing companies is not treated as an error.
+    """
+    expected = {str(p) for p in picks}
+    unknown = set(sizes) - expected
+    if unknown:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Cheque sized for a company that was not picked: {sorted(unknown)}",
+        )
+
+    for key, amount in sizes.items():
+        if amount % P.CHEQUE_STEP_USD:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"Cheque for {key} must be a multiple of {P.CHEQUE_STEP_USD:,} USD",
+            )
+        if not P.CHEQUE_MIN_USD <= amount <= P.CHEQUE_MAX_USD:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                f"Cheque for {key} must be between {P.CHEQUE_MIN_USD:,} and "
+                f"{P.CHEQUE_MAX_USD:,} USD",
+            )
+
+    if not final:
+        return
+
+    missing = expected - set(sizes)
+    if missing:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"No cheque sized for: {sorted(int(m) for m in missing)}",
+        )
+    total = sum(sizes.values())
+    if total != P.FUND_POOL_USD:
+        short = P.FUND_POOL_USD - total
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Cheques must total exactly {P.FUND_POOL_USD:,} USD; this allocation "
+            f"is {abs(short):,} {'under' if short > 0 else 'over'}.",
+        )
+
+
 @router.get("/dealflow")
 async def dealflow(run: OwnedSession) -> dict:
     """All 40 live deals, ranked by the student's own model.
@@ -38,6 +101,11 @@ async def dealflow(run: OwnedSession) -> dict:
         "cheque_usd": P.CHEQUE_USD,
         "cheques": P.N_CHEQUES,
         "picks": run.picks or [],
+        "cheque_sizes": run.cheque_sizes or {},
+        "pool_usd": P.FUND_POOL_USD,
+        "cheque_min_usd": P.CHEQUE_MIN_USD,
+        "cheque_max_usd": P.CHEQUE_MAX_USD,
+        "cheque_step_usd": P.CHEQUE_STEP_USD,
         "deployed": run.deployed,
     }
 
@@ -55,9 +123,25 @@ async def set_picks(body: PicksRequest, run: OwnedSession, db: Db) -> dict:
     if len(set(body.picks)) != len(body.picks):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Duplicate picks")
 
+    if body.cheque_sizes is not None:
+        _validate_sizes(body.cheque_sizes, body.picks, final=False)
+        run.cheque_sizes = body.cheque_sizes
+    elif run.cheque_sizes:
+        # Dropping a company must drop its cheque, or the stale entry fails
+        # validation at deploy with a confusing message about a company the
+        # student can no longer see selected.
+        keep = {str(p) for p in body.picks}
+        run.cheque_sizes = {k: v for k, v in run.cheque_sizes.items() if k in keep}
+
     run.picks = body.picks
     db.add(run)
-    return {"picks": run.picks, "slots": f"{len(run.picks)}/{P.N_CHEQUES}"}
+    return {
+        "picks": run.picks,
+        "cheque_sizes": run.cheque_sizes or {},
+        "allocated_usd": sum((run.cheque_sizes or {}).values()),
+        "pool_usd": P.FUND_POOL_USD,
+        "slots": f"{len(run.picks)}/{P.N_CHEQUES}",
+    }
 
 
 @router.post("/deploy")
@@ -75,14 +159,25 @@ async def deploy(run: OwnedSession, db: Db) -> dict:
             status.HTTP_409_CONFLICT, f"Select exactly {P.N_CHEQUES} companies"
         )
 
+    picks = run.picks or []
+    # A student who never touched the sliders deploys an even split. That is a
+    # real, defensible allocation -- it just expresses no ordering, which is
+    # exactly what Capital Allocation scores neutrally rather than punishing.
+    sizes = run.cheque_sizes or _even_split(picks)
+    _validate_sizes(sizes, picks, final=True)
+    run.cheque_sizes = sizes
+
     ds = get_dataset(run.seed)
-    result = resolve_fund(ds, run.picks or [])
+    result = resolve_fund(ds, picks, sizes)
 
     run.fund_result = result
     run.deployed = True
     run.deployed_at = now()
     db.add(run)
     await record_event(
-        db, run, "fund_deployed", payload={"picks": run.picks, "hits": result["hits"]}
+        db,
+        run,
+        "fund_deployed",
+        payload={"picks": picks, "hits": result["hits"], "cheque_sizes": sizes},
     )
     return result

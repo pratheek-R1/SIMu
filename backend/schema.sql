@@ -67,6 +67,9 @@ create table if not exists sessions (
     model_weights           jsonb,
 
     picks                   jsonb,
+    -- Cheque size per pick in whole USD, keyed by deal id as text. Null means
+    -- the pool was never sized and is split evenly across the picks.
+    cheque_sizes            jsonb,
     deployed                boolean     not null default false,
     deployed_at             timestamptz,
     fund_result             jsonb,
@@ -107,7 +110,9 @@ create table if not exists scorecards (
 -- ---------------------------------------------------------------------------
 create table if not exists reports (
     id            uuid primary key default uuid_generate_v4(),
-    session_id    uuid not null references sessions(id) on delete cascade,
+    -- One report per session. Without the constraint a repeated POST /report
+    -- inserts a duplicate and every later read of it fails.
+    session_id    uuid not null unique references sessions(id) on delete cascade,
     content_html  text,
     created_at    timestamptz not null default now()
 );

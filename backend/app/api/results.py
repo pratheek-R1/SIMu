@@ -159,12 +159,22 @@ async def create_report(run: OwnedSession, db: Db) -> dict:
     # Postgres is the only store. The report is the artefact a facilitator
     # grades from, so it lives with the session it came from rather than in a
     # separate object store that can drift out of sync with it.
-    existing = (
-        await db.execute(select(Report).where(Report.session_id == run.id))
-    ).scalar_one_or_none()
-    if existing:
-        existing.content_html = html
-        db.add(existing)
+    # Databases provisioned before `uq_report_session` existed can already hold
+    # duplicates from a repeated POST. Collapse them rather than failing the
+    # request -- the student's report is not the place to surface that history.
+    rows = (
+        await db.execute(
+            select(Report)
+            .where(Report.session_id == run.id)
+            .order_by(Report.created_at.desc())
+        )
+    ).scalars().all()
+
+    if rows:
+        rows[0].content_html = html
+        db.add(rows[0])
+        for stale in rows[1:]:
+            await db.delete(stale)
     else:
         db.add(Report(session_id=run.id, content_html=html))
 

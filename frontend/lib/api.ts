@@ -216,9 +216,22 @@ export interface Dimension {
   detail: string; components: Record<string, unknown>;
 }
 
+/** A dimension the simulation has no mechanic to evidence. Reported as an
+ *  explicit N/A card rather than scored zero or silently dropped. */
+export interface NotApplicableDimension {
+  key: string; label: string; score: null; max: null; detail: string;
+}
+
+export interface MyelinScorecard {
+  dimensions: Dimension[];
+  not_applicable: NotApplicableDimension[];
+  total: number; max: number; band: string;
+}
+
 export interface ScorecardData {
   dimensions: Dimension[];
   total: number; max: number; band: string;
+  myelin: MyelinScorecard;
   committee_analysis: {
     per_answer: { signals: string[]; matches: Record<string, string> }[];
     falsification: { signals: string[]; matches: Record<string, string> };
@@ -229,7 +242,10 @@ export interface ScorecardData {
 }
 
 export interface FundResult {
-  rows: { id: number; name: string; sector: string; cheque_usd: number; outcome: string; returned_usd: number }[];
+  rows: {
+    id: number; name: string; sector: string; cheque_usd: number;
+    share_of_fund?: number; outcome: string; returned_usd: number;
+  }[];
   deployed_usd: number; returned_usd: number; net_usd: number;
   hits: number; cheques: number;
   missed_winners: { id: number; name: string; sector: string }[];

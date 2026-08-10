@@ -70,6 +70,7 @@ def render(
             e(r["name"]),
             e(r["sector"]),
             money(r["cheque_usd"], rate),
+            f"{round(r.get('share_of_fund', 0) * 100)}%",
             e(r["outcome"]),
             money(r["returned_usd"], rate),
         ]
@@ -80,6 +81,19 @@ def render(
         [e(d["label"]), f"{d['score']} / {d['max']}", e(d["detail"])]
         for d in scorecard.get("dimensions", [])
     ]
+
+    myelin = scorecard.get("myelin") or {}
+    myelin_rows = [
+        [e(d["label"]), f"{d['score']} / {d['max']}", e(d["detail"])]
+        for d in myelin.get("dimensions", [])
+    ]
+    # N/A dimensions are printed, not omitted. A facilitator reading this file
+    # needs to see that they were considered and deliberately not scored.
+    myelin_rows += [
+        [e(d["label"]), "N/A", e(d["detail"])] for d in myelin.get("not_applicable", [])
+    ]
+
+    portfolio_total = sum(r.get("cheque_usd", 0) for r in fund.get("rows", []))
 
     share = debrief.get("share_of_evidence_seen", 0)
     generated = datetime.now(timezone.utc).strftime("%d %B %Y, %H:%M UTC")
@@ -133,11 +147,24 @@ def render(
 <tbody>{_rows(weight_rows) or '<tr><td colspan="2">No weights set.</td></tr>'}</tbody></table>
 
 <h2>Portfolio</h2>
-<table><thead><tr><th>Company</th><th>Sector</th><th>Cheque</th><th>Outcome</th>
-<th>Returned</th></tr></thead>
+<table><thead><tr><th>Company</th><th>Sector</th><th>Cheque</th><th>Share of fund</th>
+<th>Outcome</th><th>Returned</th></tr></thead>
 <tbody>{_rows(portfolio_rows)}</tbody></table>
+<p class="note">Total deployed {money(portfolio_total, rate)} across
+{len(portfolio_rows)} cheques, sized by the analyst.</p>
 
-<h2>Analyst scorecard</h2>
+<h2>Standard scorecard</h2>
+<div class="total">{myelin.get('total', 0)} <span style="font-size:16px;color:rgba(27,42,74,.4)">/ {myelin.get('max', 100)}</span></div>
+<p><span class="band">{e(myelin.get('band', ''))}</span></p>
+<table><thead><tr><th>Dimension</th><th>Score</th><th>Basis</th></tr></thead>
+<tbody>{_rows(myelin_rows)}</tbody></table>
+<p class="note">
+  Two dimensions are marked N/A rather than scored. This simulation has no
+  mechanic that produces evidence for them, and a number invented to fill the
+  gap would measure appearance rather than behaviour.
+</p>
+
+<h2>Process detail</h2>
 <div class="total">{scorecard.get('total', 0)} <span style="font-size:16px;color:rgba(27,42,74,.4)">/ {scorecard.get('max', 100)}</span></div>
 <p><span class="band">{e(scorecard.get('band', ''))}</span></p>
 <table><thead><tr><th>Dimension</th><th>Score</th><th>Basis</th></tr></thead>

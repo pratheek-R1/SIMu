@@ -1,0 +1,6 @@
+# Development and CI only. The runtime image installs requirements.txt alone --
+# the test suite drives the ASGI app in-process via httpx.ASGITransport, so it
+# needs no server and nothing here belongs in production.
+-r requirements.txt
+
+pytest==8.3.4

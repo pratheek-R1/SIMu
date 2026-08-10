@@ -250,7 +250,23 @@ async def investigative_run(http: httpx.AsyncClient) -> dict:
     await c.screen("dealflow")
     deals = await c.ok("GET", c.s("/dealflow"))
     picks = [d["id"] for d in deals["deals"][:5]]
+
+    # Sizes the cheques in the same order the model ranks them -- the behaviour
+    # Capital Allocation exists to detect. Totals the pool exactly.
+    sizes = dict(zip((str(p) for p in picks), (16, 12, 10, 7, 5)))
+    sizes = {k: v * 1_000_000 for k, v in sizes.items()}
+    assert sum(sizes.values()) == P.FUND_POOL_USD
+
+    # An allocation that does not total the pool must be refused at deploy.
     await c.ok("PUT", c.s("/picks"), json={"picks": picks})
+    short = dict(sizes)
+    short[str(picks[0])] -= 3_000_000
+    r = await c.call("PUT", c.s("/picks"), json={"picks": picks, "cheque_sizes": short})
+    assert r.status_code < 400, "a partial allocation should be storable while sizing"
+    r = await c.call("POST", c.s("/deploy"))
+    assert r.status_code == 400, "deploy accepted an allocation short of the pool"
+
+    await c.ok("PUT", c.s("/picks"), json={"picks": picks, "cheque_sizes": sizes})
     await c.ok("POST", c.s("/deploy"))
 
     await c.screen("results")
@@ -269,7 +285,7 @@ async def investigative_run(http: httpx.AsyncClient) -> dict:
     }
 
 
-async def test_leakage(http: httpx.AsyncClient) -> None:
+async def leakage_probes(http: httpx.AsyncClient) -> None:
     """The outcome must never reach the client before it is earned."""
     c = Client(http)
     await c.register("leak@meridianpartners.com", "Leak Probe")
@@ -323,7 +339,7 @@ async def main() -> int:
         async with app.router.lifespan_context(app):
             print("\nLEAKAGE PROBES")
             print("-" * 74)
-            await test_leakage(http)
+            await leakage_probes(http)
 
             print("\nNAIVE ANALYST")
             print("-" * 74)
@@ -345,6 +361,16 @@ async def main() -> int:
                 print(f"    {d['label']:<32}{d['score']:>6} / {d['max']}")
             print(f"  TOTAL {i_card['total']} / {i_card['max']}  ({i_card['band']})")
             print(f"  fund: {i_card['fund']['hits']}/5 hits")
+
+            print("\n  MYELIN STANDARD SCORECARD")
+            for label, card in (("naive", n_card), ("investigative", i_card)):
+                m = card["myelin"]
+                print(f"    -- {label} --")
+                for d in m["dimensions"]:
+                    print(f"      {d['label']:<30}{d['score']:>6} / {d['max']}")
+                print(f"      {'TOTAL':<30}{m['total']:>6} / {m['max']}  ({m['band']})")
+            for na in i_card["myelin"]["not_applicable"]:
+                print(f"      {na['label']:<30}{'N/A':>6}")
             print(
                 f"  model backtest: top-50 success {inv['backtest']['success_rate']}% "
                 f"vs {inv['backtest']['baseline_rate']}% random"
@@ -385,6 +411,50 @@ async def main() -> int:
                 "a model built on the causal variables should beat random"
             )
 
+            # ---- Myelin standard scorecard ---------------------------------
+            n_m, i_m = n_card["myelin"], i_card["myelin"]
+            assert n_m["max"] == i_m["max"] == 100, "the standard rubric is out of 100"
+            assert i_m["total"] > n_m["total"], (
+                "the investigative analyst must outscore the naive one on the "
+                "standard rubric too"
+            )
+
+            n_mby = {d["key"]: d["score"] for d in n_m["dimensions"]}
+            i_mby = {d["key"]: d["score"] for d in i_m["dimensions"]}
+
+            # A thesis made entirely of traps cannot be internally coherent, and
+            # carries no durable signal.
+            assert i_mby["strategic_thinking"] > n_mby["strategic_thinking"]
+            assert i_mby["long_term_value"] > n_mby["long_term_value"]
+
+            # Sizing in model order is what Capital Allocation measures; the
+            # naive analyst never sized, so the even split scores neutral.
+            assert i_mby["capital_allocation"] == 20.0, (
+                f"perfectly monotonic sizing scored {i_mby['capital_allocation']}/20"
+            )
+            assert n_mby["capital_allocation"] == 10.0, (
+                "an even split should score a neutral half, not zero"
+            )
+
+            # Adaptability must stay a pure rescale of Revision Quality.
+            assert i_mby["adaptability"] == round(i_by["revision_quality"] * 25 / 15, 1)
+
+            # Two dimensions have no mechanic here and must say so.
+            na_keys = {d["key"] for d in i_m["not_applicable"]}
+            assert na_keys == {"systems_thinking", "leadership"}
+            assert all(d["score"] is None for d in i_m["not_applicable"]), (
+                "an untestable dimension must be N/A, never a fabricated number"
+            )
+
+            # The fund settled at the student's own cheque sizes.
+            i_fund = i_card["fund"]
+            assert i_fund["deployed_usd"] == P.FUND_POOL_USD, (
+                f"deployed {i_fund['deployed_usd']} against a pool of {P.FUND_POOL_USD}"
+            )
+            assert len({r["cheque_usd"] for r in i_fund["rows"]}) > 1, (
+                "cheque sizes did not vary despite being sized individually"
+            )
+
             # The reveal arithmetic.
             d = inv["debrief"]
             assert d["portfolio_count"] == P.N_WINNERS
@@ -398,6 +468,16 @@ async def main() -> int:
     print("\n" + "=" * 74)
     print("ALL CHECKS PASSED")
     return 0
+
+
+def test_full_playthrough() -> None:
+    """Pytest entrypoint.
+
+    The body of this suite is one long ordered session per analyst -- every step
+    depends on the one before it, so it is a single test rather than a suite of
+    independent ones. `main()` raises on the first failed assertion.
+    """
+    assert asyncio.run(main()) == 0
 
 
 if __name__ == "__main__":
