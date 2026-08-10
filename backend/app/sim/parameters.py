@@ -99,9 +99,10 @@ CONCENTRATION_FREE_SHARE = 0.30
 #   D -- noise.        No relationship either direction. Diagnostic only: a
 #                      thesis weighted here indicates overfitting, which is a
 #                      different failure mode from survivorship bias.
-# Keys, labels and display order are taken verbatim from TAG_DEFS in
-# meridian-analyst-terminal.html so that the client and the kernel share one
-# vocabulary. What that file could NOT supply is the second number: it gave each
+# Keys, labels and display order are taken verbatim from TAG_DEFS in the
+# original single-file prototype (removed once the port was complete) so that
+# the client and the kernel share one vocabulary. What that file could NOT
+# supply is the second number: it gave each
 # variable a single `prob` and drew it independently of the outcome
 # (`tags[t.key] = sr(...) < t.prob`), which makes every variable's true lift
 # exactly 1.0. With no conditional structure there is no trap to fall into and

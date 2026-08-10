@@ -213,8 +213,10 @@ def evidence_depth(t: Telemetry) -> dict[str, Any]:
         "score": score,
         "max": 20,
         "detail": (
-            f"{len(t.profiles)} profiles opened, {t.comparisons} comparisons built, "
-            f"{len(t.charts)} distinct charts engaged with."
+            f"{len(t.profiles)} profile{'' if len(t.profiles) == 1 else 's'} opened, "
+            f"{t.comparisons} comparison{'' if t.comparisons == 1 else 's'} built, "
+            f"{len(t.charts)} distinct chart{'' if len(t.charts) == 1 else 's'} "
+            "engaged with."
             + (
                 f" Chart engagement is capped at {CHART_POINTS_CAP:g} of the 20 points; "
                 "reading companies and building comparisons carries the rest."

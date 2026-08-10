@@ -1,6 +1,7 @@
 """Deep company profiles.
 
-Ported from `getDeepData` in meridian-analyst-terminal.html, with one structural
+Ported from `getDeepData` in the original single-file prototype (removed once
+the port was complete), with one structural
 change: nothing here draws a financial figure. Every number is read from the
 canonical model in finance.py, or derived from it arithmetically. The client
 version drew its own -- `cac = srI(s+5020, 3000, 180000)` independent of the
