@@ -21,13 +21,26 @@ export const metadata: Metadata = {
 // reached for the rupee sign, which is never in the first frame.
 const PRELOAD = ["/fonts/Geist-latin.woff2", "/fonts/GeistMono-latin.woff2"];
 
+// Applied before first paint, so the page never flashes the dark default and
+// then repaints light. Dark is the default because the Myelin platform's is;
+// an explicit stored choice wins, and `system` follows the OS.
+const THEME_BOOTSTRAP = `(function(){try{
+var s=localStorage.getItem("meridian.theme");
+if(s==="light"||(s==="system"&&window.matchMedia("(prefers-color-scheme: light)").matches)){
+document.documentElement.setAttribute("data-theme","light");}
+}catch(e){}})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // suppressHydrationWarning on <html> is required, not cosmetic:
+  // THEME_BOOTSTRAP stamps data-theme before React hydrates, so the server
+  // markup legitimately differs from what the client first reads back.
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {PRELOAD.map((href) => (
           <link key={href} rel="preload" href={href} as="font" type="font/woff2" crossOrigin="anonymous" />
         ))}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
       <body>
         <StoreProvider>

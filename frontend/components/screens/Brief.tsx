@@ -12,11 +12,11 @@ export default function Brief() {
       <h1 className="stitle" style={{ fontSize: 28, marginBottom: 0 }}>
         You joined on Monday. The fund closes Friday.
       </h1>
-      <p style={{ color: "rgba(27,42,74,.5)", marginTop: 14, lineHeight: 1.7 }}>
+      <p style={{ color: "rgb(var(--ink-rgb) / 0.5)", marginTop: 14, lineHeight: 1.7 }}>
         Meridian is raising a ₹415 Cr seed fund and the partners want a thesis before it
         closes. Your job is to work out what actually distinguishes a company worth backing.
       </p>
-      <p style={{ color: "rgba(27,42,74,.5)", marginTop: 8, lineHeight: 1.7 }}>
+      <p style={{ color: "rgb(var(--ink-rgb) / 0.5)", marginTop: 8, lineHeight: 1.7 }}>
         Research has given you the firm&apos;s portfolio history — {total} companies. Read it
         however you like. When you&apos;re ready, you&apos;ll present to the investment committee
         and then deploy the fund.
@@ -24,10 +24,10 @@ export default function Brief() {
 
       <div
         className="card pad"
-        style={{ margin: "24px 0", background: "rgba(232,115,42,.04)", borderLeft: "3px solid var(--orange)" }}
+        style={{ margin: "24px 0", background: "rgb(var(--accent-rgb) / 0.04)", borderLeft: "3px solid var(--orange)" }}
       >
         <div className="eyebrow" style={{ marginBottom: 8 }}>From Ana Behl, Managing Partner</div>
-        <p style={{ fontSize: 14, lineHeight: 1.65, color: "rgba(27,42,74,.7)" }}>
+        <p style={{ fontSize: 14, lineHeight: 1.65, color: "rgb(var(--ink-rgb) / 0.7)" }}>
           Don&apos;t bring me a list of things that sound clever. Bring me variables you can
           defend with evidence, and tell me how confident you are in each one.
         </p>

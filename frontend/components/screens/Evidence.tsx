@@ -94,7 +94,7 @@ export default function Evidence() {
                   {revealed && (
                     <td
                       className="r mono"
-                      style={{ color: r.visible_lift >= 1.5 ? "var(--green)" : r.visible_lift <= 0.9 ? "var(--neg)" : "rgba(27,42,74,.5)" }}
+                      style={{ color: r.visible_lift >= 1.5 ? "var(--green)" : r.visible_lift <= 0.9 ? "var(--neg)" : "rgb(var(--ink-rgb) / 0.5)" }}
                     >
                       {r.visible_lift.toFixed(2)}x
                     </td>

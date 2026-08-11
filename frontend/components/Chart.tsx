@@ -3,13 +3,42 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 
-const NAVY = "#1B2A4A";
-const ORANGE = "#E8732A";
-const GREEN = "#2D9B5A";
-const RED = "#A32D2D";
-const MUTED = "rgba(27,42,74,.42)";
+/** Canvas cannot resolve `var(--x)`, so chart colours are read off the document
+ *  root at use time rather than baked in. Reading lazily (rather than at module
+ *  scope) is what lets the palette follow `data-theme` without a rebuild.
+ *
+ *  Fallbacks are the dark theme's values, used during server rendering where
+ *  there is no document to compute against. */
+const FALLBACKS: Record<string, string> = {
+  "--chart-primary": "#2dd4bf",
+  "--chart-accent": "#5eead4",
+  "--chart-positive": "#2dd4bf",
+  "--chart-negative": "#f2776a",
+  "--chart-neutral": "#9fb3ac",
+  "--chart-muted": "rgba(255,255,255,.46)",
+  "--chart-grid": "rgba(94,234,212,.1)",
+  "--chart-axis": "rgba(255,255,255,.55)",
+};
 
-export const COLORS = { NAVY, ORANGE, GREEN, RED, MUTED };
+function token(name: string): string {
+  if (typeof document === "undefined") return FALLBACKS[name];
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+  return value || FALLBACKS[name];
+}
+
+/** Names are kept from the previous palette so every call site still reads
+ *  COLORS.GREEN for "this series is the good one". What they resolve to is now
+ *  a theme token, not a hex literal. */
+export const COLORS = {
+  get NAVY() { return token("--chart-neutral"); },
+  get ORANGE() { return token("--chart-accent"); },
+  get GREEN() { return token("--chart-positive"); },
+  get RED() { return token("--chart-negative"); },
+  get MUTED() { return token("--chart-muted"); },
+  get PRIMARY() { return token("--chart-primary"); },
+};
 
 /** Canvas will not resolve `var(--font-mono)` inside a font string -- the whole
  *  declaration fails to parse and the context silently keeps the previous font.
@@ -17,8 +46,7 @@ export const COLORS = { NAVY, ORANGE, GREEN, RED, MUTED };
  *  sans, not the mono it asked for. Canvas needs real family names. */
 export const MONO = '"Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
 
-const GRID = "rgba(27,42,74,.07)";
-const AXIS = "rgba(27,42,74,.5)";
+
 
 function roundedRect(
   ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number,
@@ -241,7 +269,7 @@ export function BarChart({
       ctx.textAlign = "center";
 
       // Baseline.
-      ctx.strokeStyle = GRID;
+      ctx.strokeStyle = token("--chart-grid");
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, h - PAD_B + 0.5);
@@ -259,7 +287,7 @@ export function BarChart({
         const dim = hover !== null && hover !== i;
 
         ctx.globalAlpha = dim ? 0.28 : 1;
-        ctx.fillStyle = b.color ?? NAVY;
+        ctx.fillStyle = b.color ?? COLORS.PRIMARY;
         roundedRect(ctx, x, y, barW, bh, 5);
         ctx.fill();
 
@@ -271,12 +299,12 @@ export function BarChart({
         }
 
         ctx.globalAlpha = dim ? 0.35 : 1;
-        ctx.fillStyle = MUTED;
+        ctx.fillStyle = token("--chart-muted");
         ctx.fillText(b.label, x + barW / 2, h - 7);
         // The readout replaces the printed value while a bar is hovered --
         // otherwise the tooltip lands on top of its own number.
         if (hover !== i) {
-          ctx.fillStyle = NAVY;
+          ctx.fillStyle = COLORS.PRIMARY;
           ctx.fillText(
             `${Number.isInteger(b.value) ? b.value : b.value.toFixed(1)}${suffix}`,
             x + barW / 2, Math.max(11, y - 8),
@@ -325,7 +353,7 @@ export function BarChart({
           x={g.x + g.w / 2}
           y={height - PAD_B - (top > 0 ? (hb.value / top) * (height - PAD_T - PAD_B) : 0)}
           title={hb.label}
-          color={hb.color ?? NAVY}
+          color={hb.color ?? COLORS.PRIMARY}
           width={w}
           rows={[
             { k: valueLabel, v: `${hb.value.toLocaleString("en-IN")}${suffix}` },
@@ -406,7 +434,7 @@ export function ScatterChart({
       // only a rounded min and max on y and nothing at all on x.
       ctx.font = `500 9.5px ${MONO}`;
       ctx.lineWidth = 1;
-      ctx.strokeStyle = GRID;
+      ctx.strokeStyle = token("--chart-grid");
 
       ctx.textAlign = "right";
       ctx.textBaseline = "middle";
@@ -416,7 +444,7 @@ export function ScatterChart({
         ctx.moveTo(PAD.l, Math.round(py) + 0.5);
         ctx.lineTo(PAD.l + plotW, Math.round(py) + 0.5);
         ctx.stroke();
-        ctx.fillStyle = MUTED;
+        ctx.fillStyle = token("--chart-muted");
         ctx.fillText(fmt(t), PAD.l - 8, py);
       }
 
@@ -428,13 +456,13 @@ export function ScatterChart({
         ctx.moveTo(Math.round(px) + 0.5, PAD.t);
         ctx.lineTo(Math.round(px) + 0.5, PAD.t + plotH);
         ctx.stroke();
-        ctx.fillStyle = MUTED;
+        ctx.fillStyle = token("--chart-muted");
         ctx.fillText(fmt(t), px, PAD.t + plotH + 8);
       }
 
       // Crosshair sits under the marks so it never obscures one.
       if (hover) {
-        ctx.strokeStyle = "rgba(232,115,42,.45)";
+        ctx.strokeStyle = token("--chart-accent");
         ctx.setLineDash([3, 3]);
         ctx.beginPath();
         ctx.moveTo(PAD.l, Math.round(hover.py) + 0.5);
@@ -483,7 +511,7 @@ export function ScatterChart({
       ctx.globalAlpha = 1;
 
       // Axis captions.
-      ctx.fillStyle = AXIS;
+      ctx.fillStyle = token("--chart-axis");
       ctx.font = `500 10px ${MONO}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "alphabetic";

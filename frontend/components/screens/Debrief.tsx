@@ -13,7 +13,7 @@ const CLASS_NAMES: Record<string, string> = {
 };
 
 const CLASS_COLOR: Record<string, string> = {
-  A: "var(--green)", B: "var(--orange)", C: "var(--neg)", D: "rgba(27,42,74,.4)",
+  A: "var(--green)", B: "var(--orange)", C: "var(--neg)", D: "rgb(var(--ink-rgb) / 0.4)",
 };
 
 export default function Debrief() {
@@ -192,9 +192,9 @@ export default function Debrief() {
         </p>
       </div>
 
-      <div className="card pad" style={{ marginBottom: 16, background: "rgba(163,45,45,.04)", borderLeft: "3px solid var(--neg)" }}>
+      <div className="card pad" style={{ marginBottom: 16, background: "rgb(var(--neg-rgb) / 0.04)", borderLeft: "3px solid var(--neg)" }}>
         <div className="eyebrow" style={{ marginBottom: 8 }}>One more thing about the archive</div>
-        <p style={{ fontSize: 14, lineHeight: 1.7, color: "rgba(27,42,74,.75)" }}>{data.withhold_note}</p>
+        <p style={{ fontSize: 14, lineHeight: 1.7, color: "rgb(var(--ink-rgb) / 0.75)" }}>{data.withhold_note}</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10, marginTop: 14 }}>
           <div className="stat"><div className="k">Portfolio</div><div className="v">{data.portfolio_count}</div></div>
           <div className="stat"><div className="k">Archive you got</div><div className="v">{data.archive_visible.toLocaleString("en-IN")}</div></div>

@@ -115,7 +115,7 @@ export default function ProfileMenu() {
             )}
 
             <button
-              style={{ width: "100%", background: "var(--orange)", color: "#fff", borderColor: "var(--orange)" }}
+              style={{ width: "100%", background: "var(--orange)", color: "var(--on-accent)", borderColor: "var(--orange)" }}
               onClick={async () => {
                 await startSession();
                 setOpen(false);

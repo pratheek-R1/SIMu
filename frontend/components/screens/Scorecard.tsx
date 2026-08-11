@@ -42,7 +42,7 @@ export default function Scorecard() {
           <div className="eyebrow" style={{ marginBottom: 4 }}>Band</div>
           <div
             className="tag"
-            style={{ background: "rgba(232,115,42,.1)", color: "var(--orange)", fontSize: 14, padding: "6px 14px" }}
+            style={{ background: "rgb(var(--accent-rgb) / 0.1)", color: "var(--orange)", fontSize: 14, padding: "6px 14px" }}
           >
             {card.myelin.band}
           </div>
@@ -138,7 +138,7 @@ export default function Scorecard() {
       </div>
 
       {card.fund && (
-        <div className="card pad" style={{ marginBottom: 16, background: "rgba(27,42,74,.03)" }}>
+        <div className="card pad" style={{ marginBottom: 16, background: "rgb(var(--ink-rgb) / 0.03)" }}>
           <div className="eyebrow" style={{ marginBottom: 8 }}>Fund result — not scored</div>
           <p style={{ fontSize: 14 }}>
             {card.fund.hits} of {card.fund.cheques} investments succeeded.

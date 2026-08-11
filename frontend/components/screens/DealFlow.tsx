@@ -178,7 +178,7 @@ export default function DealFlow() {
       <div className="mono" style={{ fontSize: 11 }}>
         ARR {money(d.arr_usd)} · Ret {pct(d.month6_retention)} · LTV/CAC {mult(d.ltv_cac_ratio)}
       </div>
-      <div className="tag" style={{ background: "rgba(27,42,74,.05)", color: "rgba(27,42,74,.5)", marginTop: 8 }}>
+      <div className="tag" style={{ background: "rgb(var(--ink-rgb) / 0.06)", color: "var(--ink-3)", marginTop: 8 }}>
         #{d.model_rank} · score {d.model_score.toFixed(1)}
       </div>
     </div>

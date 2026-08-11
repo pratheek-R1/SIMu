@@ -341,16 +341,16 @@ function SingleView({
 
           <Card title="Departmental spend">
             <div className="spendbar">
-              <div style={{ width: `${d.dept_spend.rnd}%`, background: "#1B2A4A" }} />
-              <div style={{ width: `${d.dept_spend.sales_marketing}%`, background: "#4B6FA5" }} />
-              <div style={{ width: `${d.dept_spend.customer_success}%`, background: "#93AAC9" }} />
-              <div style={{ width: `${d.dept_spend.general_admin}%`, background: "#D9D2C4" }} />
+              <div style={{ width: `${d.dept_spend.rnd}%`, background: "var(--seq-1)" }} />
+              <div style={{ width: `${d.dept_spend.sales_marketing}%`, background: "var(--seq-2)" }} />
+              <div style={{ width: `${d.dept_spend.customer_success}%`, background: "var(--seq-3)" }} />
+              <div style={{ width: `${d.dept_spend.general_admin}%`, background: "var(--seq-4)" }} />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 12 }}>
-              <Legend color="#1B2A4A" label="R&amp;D" value={d.dept_spend.rnd} />
-              <Legend color="#4B6FA5" label="Sales &amp; marketing" value={d.dept_spend.sales_marketing} />
-              <Legend color="#93AAC9" label="Customer success" value={d.dept_spend.customer_success} />
-              <Legend color="#D9D2C4" label="G&amp;A" value={d.dept_spend.general_admin} />
+              <Legend color="var(--seq-1)" label="R&amp;D" value={d.dept_spend.rnd} />
+              <Legend color="var(--seq-2)" label="Sales &amp; marketing" value={d.dept_spend.sales_marketing} />
+              <Legend color="var(--seq-3)" label="Customer success" value={d.dept_spend.customer_success} />
+              <Legend color="var(--seq-4)" label="G&amp;A" value={d.dept_spend.general_admin} />
             </div>
             <p className="note" style={{ marginTop: 8 }}>
               Share of {money(d.dept_spend.annual_opex_usd)} annual operating expense.
@@ -480,11 +480,11 @@ function SingleView({
             {d.market.competitors.map((c) => (
               <div key={c.name} style={{ marginBottom: 6 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
-                  <span style={{ color: "rgba(27,42,74,.5)" }}>{c.name}</span>
+                  <span style={{ color: "rgb(var(--ink-rgb) / 0.5)" }}>{c.name}</span>
                   <span className="mono">{c.share_pct}%</span>
                 </div>
                 <div className="sharebar">
-                  <div style={{ width: `${c.share_pct}%`, background: "rgba(27,42,74,.25)" }} />
+                  <div style={{ width: `${c.share_pct}%`, background: "rgb(var(--ink-rgb) / 0.25)" }} />
                 </div>
               </div>
             ))}
@@ -498,7 +498,7 @@ function SingleView({
             {d.releases.map((r, i) => (
               <div key={i} style={{
                 display: "flex", justifyContent: "space-between", padding: "6px 0",
-                borderBottom: "1px solid rgba(27,42,74,.05)", fontSize: 13,
+                borderBottom: "1px solid rgb(var(--ink-rgb) / 0.05)", fontSize: 13,
               }}>
                 <span>{r.title}</span>
                 <span className="note mono">Q{r.quarter} {r.year}</span>
@@ -626,16 +626,16 @@ function CohortChart({ cohorts, companyId }: { cohorts: number[][]; companyId: n
       const yFor = (v: number) => y1 - ((v - minV) / (maxV - minV)) * (y1 - y0);
       const xFor = (i: number) => x0 + (i / 12) * (x1 - x0);
 
-      ctx.strokeStyle = "rgba(27,42,74,.2)";
+      ctx.strokeStyle = "rgb(var(--ink-rgb) / 0.2)";
       ctx.setLineDash([3, 3]);
       ctx.beginPath(); ctx.moveTo(x0, yFor(100)); ctx.lineTo(x1, yFor(100)); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = "rgba(27,42,74,.45)";
+      ctx.fillStyle = "rgb(var(--ink-rgb) / 0.45)";
       ctx.font = `500 9px ${MONO}`;
       ctx.textAlign = "left";
       ctx.fillText("100%", x0, yFor(100) - 4);
 
-      const colors = ["rgba(27,42,74,.25)", "rgba(27,42,74,.45)", "rgba(27,42,74,.7)", COLORS.ORANGE];
+      const colors = ["rgb(var(--ink-rgb) / 0.25)", "rgb(var(--ink-rgb) / 0.45)", "rgb(var(--ink-rgb) / 0.7)", COLORS.ORANGE];
       cohorts.forEach((curve, ci) => {
         ctx.strokeStyle = colors[ci % colors.length];
         ctx.lineWidth = 1.6;
@@ -647,7 +647,7 @@ function CohortChart({ cohorts, companyId }: { cohorts: number[][]; companyId: n
         ctx.stroke();
       });
 
-      ctx.fillStyle = "rgba(27,42,74,.45)";
+      ctx.fillStyle = "rgb(var(--ink-rgb) / 0.45)";
       ctx.textAlign = "center";
       ctx.fillText("Months since acquisition — four quarterly cohorts, darkest is most recent", w / 2, h - 4);
     },

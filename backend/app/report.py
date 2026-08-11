@@ -102,22 +102,30 @@ def render(
 <html lang="en"><head><meta charset="utf-8">
 <title>Investment report - {e(user_name)}</title>
 <style>
-  body {{ font-family: Georgia, 'Times New Roman', serif; color:#1B2A4A;
-         background:#F8F6F0; max-width: 860px; margin: 0 auto; padding: 48px 32px; }}
+  /* Myelin's light-theme tokens. The report keeps a light ground in both
+     themes -- it is a document that gets downloaded, emailed and printed, and
+     a dark background would waste a cartridge and read badly on paper. */
+  :root {{
+    --ink: #0a1f1a; --dim: #435850; --faint: #62766e;
+    --paper: #f4faf8; --rule: rgba(11,125,112,.16);
+    --teal: #0b7d70; --teal-deep: #075e54; --wash: rgba(11,125,112,.07);
+  }}
+  body {{ font-family: Georgia, 'Times New Roman', serif; color: var(--ink);
+         background: var(--paper); max-width: 860px; margin: 0 auto; padding: 48px 32px; }}
   h1 {{ font-size: 26px; letter-spacing:-.02em; margin:0 0 4px; }}
   h2 {{ font-size: 15px; text-transform: uppercase; letter-spacing:.1em;
-        color:rgba(27,42,74,.45); margin: 34px 0 10px; font-family: Helvetica, Arial, sans-serif; }}
-  .meta {{ color: rgba(27,42,74,.45); font-size: 13px; margin-bottom: 8px; }}
+        color: var(--faint); margin: 34px 0 10px; font-family: Helvetica, Arial, sans-serif; }}
+  .meta {{ color: var(--faint); font-size: 13px; margin-bottom: 8px; }}
   table {{ width:100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }}
-  th, td {{ text-align:left; padding: 7px 10px 7px 0; border-bottom:1px solid rgba(27,42,74,.09); }}
+  th, td {{ text-align:left; padding: 7px 10px 7px 0; border-bottom:1px solid var(--rule); }}
   th {{ font: 600 10px/1 Helvetica, Arial, sans-serif; text-transform: uppercase;
-        letter-spacing:.07em; color: rgba(27,42,74,.4); }}
+        letter-spacing:.07em; color: var(--faint); }}
   .band {{ display:inline-block; padding: 4px 12px; border-radius: 4px;
-           background: rgba(232,115,42,.1); color:#E8732A; font: 600 12px Helvetica, Arial, sans-serif; }}
-  .total {{ font-size: 36px; font-weight: 700; letter-spacing:-.02em; }}
-  blockquote {{ margin: 8px 0; padding: 12px 18px; border-left: 3px solid #E8732A;
-                background: rgba(232,115,42,.05); font-size: 14px; line-height:1.6; }}
-  .note {{ font-size: 12.5px; color: rgba(27,42,74,.5); line-height:1.65; }}
+           background: var(--wash); color: var(--teal-deep); font: 600 12px Helvetica, Arial, sans-serif; }}
+  .total {{ font-size: 36px; font-weight: 700; letter-spacing:-.02em; color: var(--teal-deep); }}
+  blockquote {{ margin: 8px 0; padding: 12px 18px; border-left: 3px solid var(--teal);
+                background: var(--wash); font-size: 14px; line-height:1.6; }}
+  .note {{ font-size: 12.5px; color: var(--dim); line-height:1.65; }}
   @media print {{ body {{ background:#fff; padding: 0; }} }}
 </style></head><body>
 

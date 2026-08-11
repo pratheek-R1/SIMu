@@ -48,8 +48,11 @@ export default function Report() {
           title="Investment report"
           srcDoc={html}
           style={{
-            width: "100%", height: "80vh", border: "1px solid rgba(27,42,74,.1)",
-            borderRadius: 8, background: "#fff",
+            // The report is a printable document and stays on its own light
+            // ground regardless of the terminal's theme -- it is meant to
+            // survive being downloaded, emailed and printed.
+            width: "100%", height: "80vh", border: "1px solid rgb(var(--ink-rgb) / 0.1)",
+            borderRadius: 8, background: "var(--report-paper)",
           }}
         />
       ) : (

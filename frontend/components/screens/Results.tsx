@@ -83,9 +83,9 @@ export default function Results() {
         </div>
       )}
 
-      <div className="card pad" style={{ marginTop: 18, background: "rgba(232,115,42,.04)", borderLeft: "3px solid var(--orange)" }}>
+      <div className="card pad" style={{ marginTop: 18, background: "rgb(var(--accent-rgb) / 0.04)", borderLeft: "3px solid var(--orange)" }}>
         <div className="eyebrow" style={{ marginBottom: 8 }}>This number is not scored</div>
-        <p style={{ fontSize: 13.5, lineHeight: 1.7, color: "rgba(27,42,74,.7)" }}>{fund.note}</p>
+        <p style={{ fontSize: 13.5, lineHeight: 1.7, color: "rgb(var(--ink-rgb) / 0.7)" }}>{fund.note}</p>
       </div>
 
       <button className="pri" style={{ marginTop: 20 }} onClick={() => go("debrief")}>

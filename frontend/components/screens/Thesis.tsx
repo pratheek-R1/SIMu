@@ -180,7 +180,7 @@ export default function Thesis() {
                             <span className="mv">{row.win_rate_without}%</span>
                           </div>
                           <div className="sharebar" style={{ height: 7 }}>
-                            <div style={{ width: `${row.win_rate_without}%`, background: "rgba(27,42,74,.32)" }} />
+                            <div style={{ width: `${row.win_rate_without}%`, background: "rgb(var(--ink-rgb) / 0.32)" }} />
                           </div>
                         </>
                       )}

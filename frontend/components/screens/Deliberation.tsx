@@ -39,7 +39,7 @@ export default function Deliberation() {
       <h2 className="stitle" style={{ fontSize: 22, marginBottom: 8 }}>
         The partners are deliberating
       </h2>
-      <p style={{ color: "rgba(27,42,74,.4)", maxWidth: 400, margin: "0 auto 34px" }}>
+      <p style={{ color: "rgb(var(--ink-rgb) / 0.4)", maxWidth: 400, margin: "0 auto 34px" }}>
         You&apos;ve been asked to wait outside.
       </p>
 
