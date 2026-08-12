@@ -72,6 +72,13 @@ class SessionSummary(BaseModel):
     band: str | None = None
     hits: int | None = None
     created_at: datetime
+    # Additive, so anything already reading this list keeps working. These let
+    # the history view render a row without a follow-up call per session.
+    furthest_screen: str | None = None
+    furthest_label: str | None = None
+    deployed: bool = False
+    completed_at: datetime | None = None
+    thesis_variables: list[str] | None = None
 
 
 class ScreenRequest(BaseModel):
@@ -99,6 +106,17 @@ class CompareRequest(BaseModel):
 
 class ChartViewRequest(BaseModel):
     chart_id: str = Field(max_length=64)
+
+
+class MetricPairRequest(BaseModel):
+    """A cross-plot axis pairing the student put on screen.
+
+    Validated against the four continuous metric keys in the endpoint; the pair
+    is canonicalised there so the two orderings of the same pair collapse.
+    """
+
+    x: str = Field(max_length=64)
+    y: str = Field(max_length=64)
 
 
 class ContradictionFlagRequest(BaseModel):

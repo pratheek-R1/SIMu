@@ -173,6 +173,11 @@
   --grid-minor: rgb(var(--accent-rgb) / 0.02);
   --grid-major: rgb(var(--accent-rgb) / 0.045);
 
+  /* The select chevron is a background-image, and a data URI cannot resolve
+     currentColor -- so the glyph is tokenised per theme rather than hardcoded.
+     It was a fixed dark navy, which is invisible on this ground. */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' opacity='.55'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+
   /* --font-heading / --font-serif / --font-mono keep their names: components
      reference them inline. Only the families behind them changed. */
   --font-heading: "Geist";
@@ -270,6 +275,8 @@
 
   --grid-minor: rgb(var(--accent-rgb) / 0.03);
   --grid-major: rgb(var(--accent-rgb) / 0.06);
+
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%230a1f1a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' opacity='.6'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
 
   /* Dark ink on a light ground loses contrast faster as alpha drops than light
      ink on a dark one, so the light ramp sits higher than the dark ramp. */
@@ -557,20 +564,34 @@ select {
   padding: 7px 30px 7px 11px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background-color: var(--surface-2);
+  /* Opaque, and deliberately not --surface-2. The native option list draws its
+     own ground from this colour, and a translucent one gets composited over
+     white by the platform -- which turned the popup into a near-white panel
+     carrying white option text. */
+  background-color: var(--surface-solid);
   color: var(--ink-1);
   cursor: pointer;
   -webkit-appearance: none;
   appearance: none;
   /* Chevron drawn inline so it matches the icon set's 1.6px stroke rather than
      whatever the platform draws. */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231b2a4a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' opacity='.45'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-image: var(--select-chevron);
   background-repeat: no-repeat;
   background-position: right 10px center;
   transition: border-color var(--fast), box-shadow var(--fast);
 }
 select:hover { border-color: var(--line-strong); }
 select:focus { outline: none; border-color: var(--orange); box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.12); }
+
+/* The popup is platform-drawn and inherits almost nothing from the select, so
+   the ground and the ink are restated here. Without this the options fall back
+   to the platform default ground while keeping the inherited white text. */
+select option,
+select optgroup {
+  background-color: var(--surface-solid);
+  color: var(--ink-1);
+}
+select option:disabled { color: var(--ink-5); }
 
 /* ---------------- Deal cards ---------------- */
 
@@ -1058,37 +1079,11 @@ input[type="range"].green-slider::-moz-range-thumb { background: var(--green); }
   font-size: 12px; font-weight: 500; text-align: right;
 }
 
-/* ---------------- Committee ---------------- */
+/* ---------------- Committee ----------------
+   The seats-on-a-bare-circle rules that used to live here (.committee-circle,
+   .cm-member and friends) are gone with the layout they styled -- see the
+   hub-and-spoke block further down. Only the validation line is shared. */
 
-.committee-container { position: relative; max-width: 600px; margin: 0 auto; }
-.committee-circle { position: relative; width: 280px; height: 280px; margin: 0 auto 40px; }
-.cm-member {
-  position: absolute; width: 50px; height: 50px; border-radius: 50%;
-  background: rgb(var(--ink-rgb) / 0.04); border: 2px solid var(--line);
-  display: flex; align-items: center; justify-content: center; transition: all 0.3s var(--ease);
-}
-.cm-member .cm-init {
-  font-family: var(--font-heading), sans-serif; font-weight: 600; font-size: 14px;
-  letter-spacing: -0.02em; color: var(--ink-4);
-}
-.cm-member .cm-name {
-  position: absolute; bottom: -21px; font-size: 10.5px; font-weight: 500;
-  letter-spacing: -0.01em; color: var(--ink-4); white-space: nowrap;
-}
-.cm-member.active {
-  border-color: var(--orange); background: rgb(var(--accent-rgb) / 0.06);
-  box-shadow: 0 0 0 5px rgb(var(--accent-rgb) / 0.1); transform: scale(1.12);
-}
-.cm-member.active .cm-init { color: var(--orange-deep); }
-.cm-member.active .cm-name { color: var(--ink-1); font-weight: 600; }
-.cm-member.done { border-color: var(--green); background: rgb(var(--pos-rgb) / 0.06); }
-.cm-member.done .cm-init { color: var(--green); }
-.committee-qa { text-align: center; }
-/* The one place the serif genuinely belongs: a partner speaking. */
-.committee-question {
-  font-family: var(--font-serif), Georgia, serif; font-size: 21px; line-height: 1.4;
-  letter-spacing: -0.005em; color: var(--ink-1); margin-bottom: 22px; text-align: left;
-}
 .committee-warning {
   color: var(--neg); font-size: 12px; font-weight: 500; margin-top: 8px; height: 16px;
   display: flex; align-items: center; gap: 6px;
@@ -1282,3 +1277,377 @@ input[type="range"].green-slider::-moz-range-thumb { background: var(--green); }
   stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
 }
 .icon-solid { fill: currentColor; stroke: none; }
+
+
+/* ---------------- Session history ----------------
+   Its own route rather than a stage of the run, so it borrows the terminal's
+   chrome but not the run rail's vocabulary. The list is an accordion: a run is
+   one row until you ask for it, because most of the time you are looking for
+   one particular run rather than reading all of them. */
+
+.hist-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 16px; flex-wrap: wrap; margin-bottom: 18px;
+}
+.hist-stats {
+  display: grid; gap: 10px; margin-bottom: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.hist-run {
+  border: 1px solid var(--line-soft); border-radius: 10px; background: var(--surface);
+  margin-bottom: 8px; overflow: hidden;
+  transition: border-color var(--med), box-shadow var(--med);
+}
+.hist-run:hover { border-color: var(--line); }
+.hist-run.open { border-color: var(--line-strong); box-shadow: var(--shadow-md); }
+
+/* The whole row is the control, so it is a button rather than a div with a
+   click handler -- keyboard and screen readers get it for free. */
+.hist-row {
+  width: 100%; display: grid; align-items: center; gap: 12px;
+  grid-template-columns: minmax(150px, auto) auto 1fr auto 20px;
+  background: none; border: none; border-radius: 0; padding: 14px 16px;
+  text-align: left; font-weight: 400; color: var(--ink-2);
+}
+.hist-row:hover:not(:disabled) {
+  background: rgb(var(--accent-rgb) / 0.05); border-color: transparent;
+  box-shadow: none; color: var(--ink-1);
+}
+.hist-row:active:not(:disabled) { transform: none; }
+.hist-when { font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+.hist-stage { white-space: nowrap; }
+.hist-score { font-size: 13px; white-space: nowrap; }
+.hist-caret {
+  font-family: var(--font-mono), monospace; font-size: 15px;
+  color: var(--ink-4); text-align: center;
+}
+
+.hist-badge {
+  font-family: var(--font-mono), monospace; font-size: 9px; font-weight: 500;
+  letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px;
+  border-radius: 4px; white-space: nowrap;
+  background: rgb(var(--ink-rgb) / 0.07); color: var(--ink-4);
+}
+.hist-badge.complete { background: rgb(var(--pos-rgb) / 0.13); color: var(--ok-text); }
+.hist-badge.active { background: rgb(var(--accent-rgb) / 0.13); color: var(--orange-deep); }
+
+.hist-body {
+  padding: 4px 16px 18px; border-top: 1px solid var(--line-soft);
+  animation: f 0.3s var(--ease) both;
+}
+.hist-meta {
+  display: grid; gap: 10px; padding: 14px 0;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.hist-meta > div { display: flex; flex-direction: column; gap: 3px; }
+.hk {
+  font-family: var(--font-mono), monospace; font-size: 9px; font-weight: 500;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-4);
+}
+.hv { font-size: 12.5px; color: var(--ink-2); }
+
+.hist-sec { padding: 14px 0; border-top: 1px solid var(--line-soft); }
+.hist-cols { display: grid; gap: 0 26px; grid-template-columns: 1fr 1fr; }
+@media (max-width: 780px) { .hist-cols { grid-template-columns: 1fr; } }
+
+.hist-scores {
+  display: grid; gap: 14px; margin-bottom: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+.hist-dims { display: grid; gap: 0 22px; grid-template-columns: 1fr 1fr; }
+@media (max-width: 780px) { .hist-dims { grid-template-columns: 1fr; } }
+.hist-dim {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 5px 0; border-bottom: 1px solid var(--line-soft); font-size: 12.5px;
+}
+.hist-dim:last-child { border-bottom: none; }
+.hist-dim .mono { font-size: 12.5px; color: var(--ink-1); white-space: nowrap; }
+
+.hist-check { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; }
+.hist-check .on { color: var(--ok-text); display: flex; padding-top: 2px; }
+.hist-check .off { color: var(--ink-5); display: flex; padding-top: 2px; }
+
+/* The rule runs behind the dots rather than between them, so a run reads as one
+   continuous thread instead of a stack of unrelated rows. */
+.hist-timeline { list-style: none; position: relative; padding: 4px 0 0; }
+.hist-timeline::before {
+  content: ""; position: absolute; left: 63px; top: 12px; bottom: 8px;
+  width: 1px; background: var(--line);
+}
+.hist-timeline li {
+  display: grid; grid-template-columns: 52px 22px 1fr; align-items: baseline;
+  gap: 0; padding: 5px 0; position: relative;
+}
+.tl-time { font-size: 10.5px; color: var(--ink-5); text-align: right; }
+.tl-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--orange);
+  justify-self: center; position: relative; top: 5px;
+  box-shadow: 0 0 0 3px var(--paper);
+}
+.tl-text { font-size: 13px; color: var(--ink-2); line-height: 1.55; }
+.tl-text strong { color: var(--ink-1); font-weight: 560; }
+
+
+/* ---------------- Brief ----------------
+   Reads as an internal document rather than a second landing hero: a routing
+   header in mono, a measured column of prose, the fund's real figures, and the
+   sequence of what is coming. The landing page is centred and atmospheric; this
+   is left-aligned and administrative, which is the difference between being sold
+   something and being handed a file. */
+
+/* Centred column, left-aligned contents.
+   Flush-left inside the 1120px wrap left ~460px of dead space on the right and
+   read as an unfinished layout. Centring the column balances the viewport.
+   The contents stay left-aligned on purpose -- see .brief-lede. */
+.brief { max-width: 660px; margin: 0 auto; padding: 22px 0 32px; }
+
+/* Serif, and only here. The brief is the one editorial moment in the terminal;
+   every other screen is working chrome. */
+.brief-title {
+  font-family: var(--font-serif), Georgia, serif; font-weight: 400;
+  font-size: 34px; line-height: 1.14; letter-spacing: -0.01em;
+  color: var(--ink-1); margin-bottom: 16px;
+}
+/* Left-aligned, not centred. Centred body copy gives every line a different
+   starting x, so the eye has to re-find the left edge on each new line -- it
+   costs real reading speed on a paragraph this long, and the numbered stage list
+   below it depends on a consistent left edge to scan at all. Centre the column,
+   not the type. */
+.brief-lede {
+  font-size: 15px; line-height: 1.72; color: var(--ink-3); margin-bottom: 24px;
+}
+
+.brief-figures {
+  display: grid; gap: 1px; background: var(--line-soft);
+  border: 1px solid var(--line-soft); border-radius: 9px; overflow: hidden;
+  grid-template-columns: repeat(auto-fit, minmax(152px, 1fr)); margin-bottom: 24px;
+}
+/* min-width:0 so a grid track can actually shrink, and a wrap rule on the
+   figure itself. A single unformatted value overflowed this row and dragged the
+   fourth cell off the edge of the container. */
+/* space-between pins the caption to the bottom of the cell. Grid rows already
+   stretch to a common height, so when one value wraps to two lines (the cheque
+   range does) every caption still sits on the same baseline instead of that one
+   cell's caption dropping below its neighbours. */
+.brief-figures > div {
+  background: var(--surface); padding: 13px 15px; min-width: 0;
+  display: flex; flex-direction: column; gap: 4px; justify-content: space-between;
+}
+.bfk {
+  font-family: var(--font-mono), monospace; font-size: 9px; font-weight: 500;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-4);
+}
+.bfv {
+  font-size: 17px; font-weight: 500; line-height: 1.25; letter-spacing: -0.03em;
+  color: var(--ink-1); word-spacing: -0.22em;
+  min-width: 0; overflow-wrap: anywhere;
+}
+.bfd { font-size: 11px; color: var(--ink-5); line-height: 1.45; }
+
+/* A quotation, not a callout card -- the old version reused .card and so read as
+   another panel of UI rather than as a person saying something. */
+.brief-quote {
+  border-left: 2px solid var(--orange); padding: 4px 0 4px 20px; margin-bottom: 26px;
+}
+.brief-quote p {
+  font-family: var(--font-serif), Georgia, serif; font-size: 19px; line-height: 1.5;
+  color: var(--ink-2); margin-bottom: 8px;
+}
+.bq-attr {
+  font-size: 10px; font-weight: 500; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.brief-stages { margin-bottom: 26px; }
+.brief-stages ol { list-style: none; }
+.brief-stages li {
+  display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: baseline;
+  padding: 9px 0; border-bottom: 1px solid var(--line-soft);
+}
+.brief-stages li:last-child { border-bottom: none; }
+.bs-n { font-size: 11px; color: var(--ink-5); letter-spacing: 0; }
+.bs-body { display: flex; flex-direction: column; gap: 2px; }
+.bs-body strong {
+  font-family: var(--font-heading), sans-serif; font-size: 13.5px; font-weight: 560;
+  letter-spacing: -0.015em; color: var(--ink-1);
+}
+
+.brief-foot { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.brief-foot .note { max-width: 460px; }
+
+@media (max-width: 640px) {
+  .brief-title { font-size: 27px; }
+  .brief-lede { font-size: 14.5px; }
+}
+
+
+/* ---------------- Committee: hub and spoke ----------------
+   Five seats around a central chair. The partner holding the floor is lit and
+   everyone else recedes, so the screen answers "whose turn is it" before it is
+   read. Colour is not the only carrier of state -- an answered seat swaps its
+   initials for a tick, and the live seat is the only one that pulses -- because
+   a teal-vs-grey distinction alone fails for a red-green colourblind reader. */
+
+/* One centred column: header, then the table, then the floor. The two-column
+   version put the diagram and the question side by side, which meant the thing
+   you were reading and the thing telling you who was asking sat in different
+   halves of the screen. Stacked and centred, the eye runs straight down. */
+.cm-screen { max-width: 640px; margin: 0 auto; text-align: center; }
+
+/* 400px is not arbitrary: it equals the SVG viewBox width, so one user unit is
+   one CSS pixel and the spoke geometry in Committee.tsx (DISC_R, SPOKE_GAP) lines
+   up with the disc size below. Changing one without the other reintroduces the
+   spokes-through-the-circles bug. */
+.cm-diagram {
+  position: relative; width: 100%; max-width: 400px; margin: 0 auto 6px;
+}
+.cm-svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+/* ---- spokes ---- */
+.cm-spoke-line {
+  stroke: var(--line); stroke-width: 1.25; fill: none;
+  transition: stroke var(--med), stroke-width var(--med), opacity var(--med);
+}
+.cm-spoke.pending .cm-spoke-line {
+  stroke: rgb(var(--ink-rgb) / 0.12); stroke-dasharray: 3 5;
+}
+.cm-spoke.done .cm-spoke-line { stroke: rgb(var(--accent-rgb) / 0.3); }
+.cm-spoke.active .cm-spoke-line { stroke: var(--accent); stroke-width: 2; }
+/* The wide soft pass under the bright one. Cheaper than an SVG filter and it
+   does not blur the crisp line on top of it. */
+.cm-spoke-glow {
+  stroke: var(--accent); stroke-width: 9; opacity: 0.16;
+  stroke-linecap: round; filter: blur(3px);
+}
+
+/* ---- hub ---- */
+.cm-hub { fill: var(--accent); opacity: 0.9; }
+.cm-hub-ring {
+  fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 4;
+}
+.cm-hub-label {
+  font-family: var(--font-mono), monospace; font-size: 8.5px; font-weight: 500;
+  letter-spacing: 0.18em; fill: var(--ink-5);
+}
+
+/* ---- seats ---- */
+.cm-seat {
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: none; border: none; padding: 0; border-radius: 10px;
+  cursor: pointer; transition: transform var(--med), opacity var(--med);
+}
+.cm-seat:hover:not(:disabled) {
+  background: none; box-shadow: none; border-color: transparent;
+  transform: translate(-50%, -50%) scale(1.06);
+}
+.cm-seat:active:not(:disabled) { transform: translate(-50%, -50%) scale(1.01); }
+.cm-seat:disabled { cursor: default; opacity: 1; }
+
+/* 46px, i.e. DISC_R * 2 in Committee.tsx. Keep the two in step. */
+.cm-disc {
+  width: 46px; height: 46px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono), monospace; font-size: 13px; font-weight: 500;
+  letter-spacing: -0.02em;
+  border: 1.5px solid var(--line); background: var(--surface-solid);
+  color: var(--ink-4);
+  transition: border-color var(--med), background var(--med), color var(--med),
+    box-shadow var(--med);
+}
+.cm-seat-name {
+  font-family: var(--font-heading), sans-serif; font-size: 11.5px; font-weight: 500;
+  letter-spacing: -0.01em; color: var(--ink-4);
+  transition: color var(--med);
+}
+
+/* Muted: has not spoken. */
+.cm-seat.pending .cm-disc {
+  border-color: rgb(var(--ink-rgb) / 0.12);
+  background: rgb(var(--ink-rgb) / 0.03);
+  color: var(--ink-5);
+}
+.cm-seat.pending .cm-seat-name { color: var(--ink-5); }
+
+/* Answered: on the record, and revisitable. */
+.cm-seat.done .cm-disc {
+  border-color: rgb(var(--accent-rgb) / 0.4);
+  background: rgb(var(--accent-rgb) / 0.09);
+  color: var(--ok-text);
+}
+.cm-seat.done .cm-seat-name { color: var(--ink-3); }
+
+/* Holding the floor. */
+.cm-seat.active .cm-disc {
+  border-color: var(--accent); border-width: 2px;
+  background: rgb(var(--accent-rgb) / 0.16); color: var(--accent);
+  box-shadow: 0 0 0 5px rgb(var(--accent-rgb) / 0.1),
+    0 0 22px rgb(var(--accent-rgb) / 0.34);
+  animation: cmPulse 2.8s var(--ease) infinite;
+}
+.cm-seat.active .cm-seat-name { color: var(--ink-1); font-weight: 600; }
+
+@keyframes cmPulse {
+  0%, 100% { box-shadow: 0 0 0 5px rgb(var(--accent-rgb) / 0.1),
+                         0 0 22px rgb(var(--accent-rgb) / 0.3); }
+  50%      { box-shadow: 0 0 0 8px rgb(var(--accent-rgb) / 0.05),
+                         0 0 30px rgb(var(--accent-rgb) / 0.46); }
+}
+
+/* Whichever seat the panel is currently showing. */
+.cm-seat.viewing .cm-disc { border-color: var(--orange-deep); }
+
+/* Below the diagram's max width the SVG scales down but the discs, being sized
+   in CSS pixels, do not -- so they grow relative to the spokes and would start
+   swallowing the line ends again. Shrink them in step. */
+@media (max-width: 430px) {
+  .cm-disc { width: 38px; height: 38px; font-size: 11.5px; }
+  .cm-seat-name { font-size: 10.5px; }
+}
+
+/* ---- panel ---- */
+.cm-panel { min-width: 0; }
+/* Centred, so no left rule -- a border on one edge of centred content reads as
+   a misalignment. A hairline above does the same separating job symmetrically. */
+.cm-floor {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border-top: 1px solid var(--line-soft); padding: 14px 0 0; margin-bottom: 14px;
+}
+.cm-floor-k {
+  font-family: var(--font-mono), monospace; font-size: 9px; font-weight: 500;
+  letter-spacing: 0.13em; text-transform: uppercase; color: var(--ink-4);
+}
+.cm-floor-name {
+  font-family: var(--font-heading), sans-serif; font-size: 18px; font-weight: 600;
+  letter-spacing: -0.025em; color: var(--ink-1); line-height: 1.2;
+}
+.cm-floor-title { font-size: 12.5px; color: var(--ink-3); }
+.cm-floor-step { font-size: 10.5px; color: var(--ink-5); margin-top: 3px; }
+
+.cm-selector {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px;
+  justify-content: center;
+}
+
+.cm-question {
+  font-size: 18px; color: var(--ink-2); margin: 0 auto 16px; max-width: 560px;
+}
+
+/* Prose the student typed stays left-aligned inside the centred box: a centred
+   paragraph gives every line a different starting x, and an answer can run to
+   several lines. Centre the container, not the writing. */
+.cm-locked {
+  background: var(--surface); border: 1px solid var(--line-soft);
+  border-radius: 9px; padding: 14px 16px; text-align: left;
+}
+.cm-screen textarea { text-align: left; }
+.cm-screen .committee-warning { justify-content: center; }
+
+
+/* The cheque-sizing text input has been removed -- see DealFlow.tsx. Note for
+   anyone adding an input inside a component in future: the global rule near the
+   top of this file targets `input[type="text"]` and sets width:100%. An
+   element+attribute selector outranks a bare class, so `.my-input { width: 62px }`
+   loses to it and the field renders full-bleed. Use `input.my-input` if you need
+   to win that fight. */

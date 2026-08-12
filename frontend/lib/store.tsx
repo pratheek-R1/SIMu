@@ -33,6 +33,11 @@ interface Store {
   go: (screen: ScreenKey) => Promise<void>;
   chartSeen: (chartId: string) => void;
   sessionId: string | null;
+  /** True when the current session was opened deliberately from the history
+   *  page, rather than restored from localStorage at boot. The terminal rolls a
+   *  finished run onto a fresh one, and must not do that to a run the student
+   *  just asked to reopen. */
+  openedFromHistory: boolean;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -45,6 +50,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [state, setState] = useState<SessionState | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [openedFromHistory, setOpenedFromHistory] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastSeq = useRef(0);
   // Charts already reported this session -- the server dedupes too, this just
@@ -97,6 +103,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (sessionId && user) void refreshState();
   }, [sessionId, user, refreshState]);
 
+  // Whether the stale-session decision below has already been made this page
+  // load. The provider lives in the root layout and does not remount on route
+  // changes, so this survives navigating between the terminal and history.
+  const staleChecked = useRef(false);
+
   const signIn = useCallback(async (email: string, password: string) => {
     const r = await api.post<{ access_token: string }>("/auth/login", { email, password });
     setToken(r.access_token);
@@ -123,6 +134,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const s = await api.post<{ id: string }>("/sessions", {});
     localStorage.setItem(SESSION_KEY, s.id);
     setSessionId(s.id);
+    setOpenedFromHistory(false);
     seenCharts.current.clear();
     setState(await api.get<SessionState>(`/sessions/${s.id}/state`));
     return s.id;
@@ -131,8 +143,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const loadSession = useCallback(async (id: string) => {
     localStorage.setItem(SESSION_KEY, id);
     setSessionId(id);
+    setOpenedFromHistory(true);
+    seenCharts.current.clear();
     setState(await api.get<SessionState>(`/sessions/${id}/state`));
   }, []);
+
+  /* A session id restored from localStorage can point at a run that is already
+     finished, and resuming into it drops you onto an old scorecard with no
+     obvious way to begin again. So a finished run gets replaced by a fresh one.
+     The old run is not lost -- it is in Session history.
+  
+     This must happen on the FIRST state we see in a page load and never again.
+     An earlier version of this lived in the terminal screen and re-evaluated on
+     every state change, which meant it also fired at the natural end of a run:
+     completing the scorecard flipped status to "complete", a new session was
+     created while the student was reading their results, and the Report screen
+     then POSTed /report against the empty session and got a 409, leaving the
+     download button dead. Deciding once, here, is what keeps that from
+     recurring. */
+  useEffect(() => {
+    if (!ready || !user || !state || staleChecked.current) return;
+    staleChecked.current = true;
+    if (state.status === "complete" && !openedFromHistory) void startSession();
+  }, [ready, user, state, openedFromHistory, startSession]);
 
   const go = useCallback(
     async (screen: ScreenKey) => {
@@ -157,9 +190,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     () => ({
       ready, user, config, state, toasts, toast, signIn, register, signOut,
       refreshUser, startSession, loadSession, refreshState, go, chartSeen, sessionId,
+      openedFromHistory,
     }),
     [ready, user, config, state, toasts, toast, signIn, register, signOut,
-     refreshUser, startSession, loadSession, refreshState, go, chartSeen, sessionId],
+     refreshUser, startSession, loadSession, refreshState, go, chartSeen, sessionId,
+     openedFromHistory],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

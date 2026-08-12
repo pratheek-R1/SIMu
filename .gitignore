@@ -43,6 +43,11 @@ Thumbs.db
 .vscode/
 .idea/
 
+# ── Generated artefacts ──────────────────────────────────────
+# A downloaded investment report carries the analyst's name and email address.
+# It is output, not source, and does not belong in the repository.
+meridian-investment-report*.html
+
 # ── Misc ─────────────────────────────────────────────────────
 *.log
 *.pem

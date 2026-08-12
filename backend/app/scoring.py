@@ -52,6 +52,18 @@ EVENT_KINDS = {
     "comparison_group_requested",
     "archive_completeness_questioned",
     "committee_answer",
+    "metric_pair_explored",
+}
+
+# The four continuous metrics are the only genuinely causal evidence that cannot
+# be read off a single company -- seeing them requires putting two axes against
+# each other. Every unordered pair of distinct metrics, canonicalised so that
+# (retention, margin) and (margin, retention) are one pair rather than two.
+VALID_METRIC_PAIRS = {
+    "|".join(sorted((a, b)))
+    for a in P.CONTINUOUS_KEYS
+    for b in P.CONTINUOUS_KEYS
+    if a != b
 }
 
 # Charts the client is allowed to report engagement with. An unknown id is
@@ -87,11 +99,20 @@ class Telemetry:
     comparison_group_pre_reveal: bool = False
     archive_questioned_post_reveal: bool = False
     committee_signals: list[dict[str, Any]] = field(default_factory=list)
+    metric_pairs: set[str] = field(default_factory=set)
 
     @property
     def cross_source_companies(self) -> set[int]:
         """Companies where the student read BOTH accounts of the same period."""
         return self.minutes_opened & self.interviews_opened
+
+    @property
+    def metrics_examined(self) -> set[str]:
+        """Distinct continuous metrics the student put on an axis."""
+        out: set[str] = set()
+        for pair in self.metric_pairs:
+            out.update(pair.split("|"))
+        return out
 
 
 def aggregate(events: Iterable[Any]) -> Telemetry:
@@ -130,6 +151,8 @@ def aggregate(events: Iterable[Any]) -> Telemetry:
                 t.archive_questioned_post_reveal = True
         elif kind == "committee_answer":
             t.committee_signals.append(payload)
+        elif kind == "metric_pair_explored" and subject in VALID_METRIC_PAIRS:
+            t.metric_pairs.add(subject)
     return t
 
 
@@ -192,21 +215,56 @@ def _true_strength(lift: float) -> float:
 # --------------------------------------------------------------------------
 # Dimensions
 # --------------------------------------------------------------------------
+# Every channel into this dimension is capped, because none of the three is
+# evidence of the other two and each is individually cheap to manufacture.
+#
 # Chart engagement is the one signal the client self-reports (the server cannot
-# observe a hover), and it is the cheapest of the three to produce. Capping its
-# contribution stops it standing in for research it does not evidence: a live
-# session scored 18.0/20 here from nine chart hovers with zero profiles opened
-# and zero comparisons built, which is not what this dimension claims to measure.
-CHART_POINTS_CAP = 8.0
+# observe a hover). It was already capped, after a live session scored 18.0/20
+# from nine chart hovers with zero profiles opened and zero comparisons built.
+#
+# Comparisons were NOT capped, and at 4 points each that left a wider hole than
+# the one the chart cap closed: five bare POSTs to /compare -- which needs only
+# two company ids and opens nothing -- scored a full 20/20 with no profile ever
+# read. Verified against a running server. Comparisons are the most meaningful of
+# the three signals, so they keep the highest per-unit value; they just can no
+# longer stand in for the whole dimension.
+# The fourth channel is the cross-plot. The four continuous metrics are all
+# genuinely causal -- and were previously worth nothing at all, in any dimension,
+# despite being the only evidence in the simulation that cannot be misread off a
+# single winner's profile. Reading them requires putting two against each other,
+# so the unit here is a distinct metric PAIR rather than a page view.
+PROFILE_POINTS_PER = 0.6
+PROFILE_POINTS_CAP = 8.0
+COMPARISON_POINTS_PER = 2.0
+COMPARISON_POINTS_CAP = 6.0
+CHART_POINTS_PER = 1.0
+CHART_POINTS_CAP = 4.0
+METRIC_PAIR_POINTS_PER = 0.5
+METRIC_PAIR_POINTS_CAP = 2.0
 
 
 def evidence_depth(t: Telemetry) -> dict[str, Any]:
-    profile_points = len(t.profiles) * 0.6
-    comparison_points = t.comparisons * 4
-    chart_points = min(CHART_POINTS_CAP, len(t.charts) * 2)
-    score = min(20.0, round(profile_points + comparison_points + chart_points, 1))
+    pairs = len(t.metric_pairs)
+    profile_points = min(PROFILE_POINTS_CAP, len(t.profiles) * PROFILE_POINTS_PER)
+    comparison_points = min(COMPARISON_POINTS_CAP, t.comparisons * COMPARISON_POINTS_PER)
+    chart_points = min(CHART_POINTS_CAP, len(t.charts) * CHART_POINTS_PER)
+    metric_points = min(METRIC_PAIR_POINTS_CAP, pairs * METRIC_PAIR_POINTS_PER)
+    score = min(
+        20.0,
+        round(profile_points + comparison_points + chart_points + metric_points, 1),
+    )
 
-    capped = len(t.charts) * 2 > CHART_POINTS_CAP
+    at_cap = [
+        name
+        for name, points, cap in (
+            ("profiles", profile_points, PROFILE_POINTS_CAP),
+            ("comparisons", comparison_points, COMPARISON_POINTS_CAP),
+            ("charts", chart_points, CHART_POINTS_CAP),
+            ("metric pairs", metric_points, METRIC_PAIR_POINTS_CAP),
+        )
+        if points >= cap
+    ]
+
     return {
         "key": "evidence_depth",
         "label": "Evidence Depth",
@@ -216,11 +274,13 @@ def evidence_depth(t: Telemetry) -> dict[str, Any]:
             f"{len(t.profiles)} profile{'' if len(t.profiles) == 1 else 's'} opened, "
             f"{t.comparisons} comparison{'' if t.comparisons == 1 else 's'} built, "
             f"{len(t.charts)} distinct chart{'' if len(t.charts) == 1 else 's'} "
-            "engaged with."
+            f"engaged with, {pairs} metric pair{'' if pairs == 1 else 's'} "
+            "cross-plotted."
             + (
-                f" Chart engagement is capped at {CHART_POINTS_CAP:g} of the 20 points; "
-                "reading companies and building comparisons carries the rest."
-                if capped
+                " No single kind of activity can carry this dimension on its own: "
+                f"{'; '.join(at_cap)} {'is' if len(at_cap) == 1 else 'are'} at "
+                "the per-channel cap, and the remaining points need the others."
+                if at_cap and score < 20.0
                 else ""
             )
         ),
@@ -228,25 +288,67 @@ def evidence_depth(t: Telemetry) -> dict[str, Any]:
             "profiles": len(t.profiles),
             "comparisons": t.comparisons,
             "charts": len(t.charts),
-            "chart_points_capped": capped,
+            "metric_pairs": sorted(t.metric_pairs),
+            "metrics_examined": sorted(t.metrics_examined),
+            "profile_points": round(profile_points, 1),
+            "comparison_points": round(comparison_points, 1),
+            "chart_points": round(chart_points, 1),
+            "metric_points": round(metric_points, 1),
+            "at_cap": at_cap,
+            # Retained: previously the only cap, so keep the key readable.
+            "chart_points_capped": chart_points >= CHART_POINTS_CAP,
         },
     }
 
 
+# Points for the written-reasoning signals the rubric already extracts.
+#
+# `analyse_free_text` has always produced four signals, and the scorecard screen
+# has always listed all four back to the student ("asked for a comparison group",
+# "gave a number", "stated a falsifiable threshold"). Only `missing_data` was
+# ever worth anything, so the other three were advertised credit that did not
+# exist -- a student could write five careful answers and score exactly what a
+# single search query scores. These three now carry a point each.
+#
+# The 25 is unchanged, so the process total stays 100: one point each comes off
+# the three secondary behavioural terms. The flagship 10-point term for naming
+# the missing data is deliberately untouched -- it is the core lesson. Retuning
+# is a matter of editing these two dicts and nothing else.
+WRITTEN_SIGNAL_POINTS = {
+    # Asking for a comparison group in writing is now the only way to be credited
+    # for asking at all -- the button that used to earn it behaviourally is gone
+    # (it read as a control that would reveal withheld failure data), so its
+    # weight moved here. The thinking is still measured; only the channel changed.
+    "comparison_group": 3,
+    "quantified": 1,
+    "falsifiable": 1,
+}
+WRITTEN_SIGNAL_PHRASES = {
+    "comparison_group": "asked in writing for a comparison group or base rate",
+    "quantified": "quantified a claim rather than asserting it",
+    "falsifiable": "stated a threshold that would change their mind",
+}
+
+
 def provenance(t: Telemetry, committee: dict[str, Any]) -> dict[str, Any]:
-    asked_in_committee = "missing_data" in committee.get("aggregate_signals", [])
+    signals = set(committee.get("aggregate_signals", []))
+    asked_in_committee = "missing_data" in signals
 
     plain_language = t.provenance_query_pre_reveal or asked_in_committee
+    # The former `requested_a_comparison_group_before_the_reveal` term is gone
+    # with the control that produced it; its 4 points were redistributed across
+    # the ghost search, the post-reveal question and the written comparison-group
+    # signal, so this dimension still totals 25 and is still reachable in full.
     parts = {
         "asked_where_the_data_came_from": 10 if plain_language else 0,
         "searched_for_a_company_not_in_the_set": 5 if t.ghost_query else 0,
-        "requested_a_comparison_group_before_the_reveal": (
-            5 if t.comparison_group_pre_reveal else 0
-        ),
         "questioned_the_archive_after_the_reveal": (
             5 if t.archive_questioned_post_reveal else 0
         ),
     }
+    for name, points in WRITTEN_SIGNAL_POINTS.items():
+        parts[f"written_{name}"] = points if name in signals else 0
+
     score = float(sum(parts.values()))
 
     earned: list[str] = []
@@ -256,10 +358,11 @@ def provenance(t: Telemetry, committee: dict[str, Any]) -> dict[str, Any]:
         earned.append("raised the missing-data problem with the committee")
     if t.ghost_query:
         earned.append("searched for a company absent from the winners set")
-    if t.comparison_group_pre_reveal:
-        earned.append("asked for a comparison group before the archive arrived")
     if t.archive_questioned_post_reveal:
         earned.append("questioned whether the recovered archive was itself complete")
+    for name in WRITTEN_SIGNAL_POINTS:
+        if name in signals:
+            earned.append(WRITTEN_SIGNAL_PHRASES[name])
 
     return {
         "key": "provenance",
@@ -534,7 +637,12 @@ def capital_allocation(
             "score": 10.0,
             "max": 20,
             "detail": "Too few cheques to compare sizing against conviction.",
-            "components": {"pairs": 0, "concordant": 0, "neutral": True},
+            "components": {
+                "pairs": 0,
+                "concordant": 0,
+                "neutral": True,
+                "neutral_reason": "too_few_picks",
+            },
         }
 
     scored = [
@@ -560,19 +668,65 @@ def capital_allocation(
     ratio = 0.5 if neutral else concordant / pairs
     score = round(20.0 * ratio, 1)
 
+    # `pairs == 0` has two quite different causes and the scorecard used to
+    # report both of them as "every cheque was the same size", which is simply
+    # false in the second case: a student can size five cheques deliberately and
+    # still land here because their own model rates all five picks identically,
+    # and every pair then ties on the score axis instead of the size axis. The
+    # neutral score is right either way -- there is no ordering to agree with --
+    # but telling someone they sized uniformly when they did not is a bug in the
+    # feedback, and it hides the thing they actually need to know.
+    uniform_sizing = len({s for _, s in scored}) <= 1
+    model_cannot_rank = len({m for m, _ in scored}) <= 1
+
+    if not neutral:
+        neutral_reason = None
+        detail = (
+            f"{concordant} of {pairs} pairs of picks were sized in the same order "
+            "your model ranked them."
+        )
+    elif uniform_sizing and model_cannot_rank:
+        neutral_reason = "uniform_sizing_and_flat_model"
+        detail = (
+            "Every cheque was the same size, and your model scores all of these "
+            "picks identically, so neither the allocation nor the model expressed "
+            "a ranking. Scored neutrally rather than as a mistake."
+        )
+    elif uniform_sizing:
+        neutral_reason = "uniform_sizing"
+        detail = (
+            "Every cheque was the same size, so the allocation expressed no ranking. "
+            "Scored neutrally rather than as a mistake."
+        )
+    elif model_cannot_rank:
+        neutral_reason = "flat_model"
+        detail = (
+            "You sized these cheques differently, but your model scores every one of "
+            "these picks identically, so there is no ranking for the sizing to agree "
+            "or disagree with. Scored neutrally: the flat ranking is a property of "
+            "the model, not of the allocation."
+        )
+    else:
+        neutral_reason = "all_pairs_tied"
+        detail = (
+            "Every pair of picks tied on either conviction or cheque size, so no "
+            "ordering could be compared. Scored neutrally rather than as a mistake."
+        )
+
     return {
         "key": "capital_allocation",
         "label": "Capital Allocation",
         "score": score,
         "max": 20,
-        "detail": (
-            "Every cheque was the same size, so the allocation expressed no ranking. "
-            "Scored neutrally rather than as a mistake."
-            if neutral
-            else f"{concordant} of {pairs} pairs of picks were sized in the same order "
-            "your model ranked them."
-        ),
-        "components": {"pairs": pairs, "concordant": concordant, "neutral": neutral},
+        "detail": detail,
+        "components": {
+            "pairs": pairs,
+            "concordant": concordant,
+            "neutral": neutral,
+            "neutral_reason": neutral_reason,
+            "uniform_sizing": uniform_sizing,
+            "model_cannot_rank": model_cannot_rank,
+        },
     }
 
 
@@ -647,33 +801,91 @@ def adaptability(revision: dict[str, Any]) -> dict[str, Any]:
 
 def long_term_value(ds: Dataset, weights: dict[str, float] | None) -> dict[str, Any]:
     """Does conviction sit on durable causal signal, or on variables that merely
-    look strong once the failures are hidden?"""
+    look strong once the failures are hidden?
+
+    Measured over POSITIVE conviction, plus any conviction pointed AGAINST a
+    causal variable.
+
+    This previously summed abs(w) over every non-zero weight into the
+    denominator. That put correctly-placed negative weight somewhere it could
+    never reach the numerator, so an analyst who correctly marked the
+    reverse-trap variables (realised lift < 1.0, i.e. they predict failure) as
+    negative predictors scored strictly LOWER than one who left them at zero --
+    penalising the better-informed model, and directly contradicting Strategic
+    Thinking, which credits that same behaviour. Marking a variable down is not
+    conviction placed on it.
+
+    Betting against a genuinely causal variable is still a real cost to
+    durability, so that alone stays in the denominator.
+    """
     weights = weights or {}
-    causal_weight = total = 0.0
+    causal_positive = positive_total = against_causal = 0.0
+    misplaced: list[dict[str, Any]] = []
+    discounted: list[str] = []
+
     for key in P.FEATURE_KEYS:
         w = float(weights.get(key, 0.0))
         if not w:
             continue
-        total += abs(w)
-        if key in P.CAUSAL_FEATURES and w > 0:
-            causal_weight += w
+        is_causal = key in P.CAUSAL_FEATURES
+        if w > 0:
+            positive_total += w
+            if is_causal:
+                causal_positive += w
+            else:
+                misplaced.append(
+                    {
+                        "feature": key,
+                        "label": P.FEATURE_LABELS[key],
+                        "weight": round(w, 2),
+                        "true_lift": round(_lift(ds, key), 2),
+                    }
+                )
+        elif is_causal:
+            against_causal += abs(w)
+        else:
+            discounted.append(key)
 
-    ratio = causal_weight / total if total else 0.0
+    denominator = positive_total + against_causal
+    ratio = causal_positive / denominator if denominator else 0.0
     score = round(20.0 * ratio, 1)
+
+    if not denominator:
+        detail = "No positive conviction was expressed, so there is nothing to place."
+    else:
+        detail = (
+            f"{round(ratio * 100)}% of the conviction you expressed sits on the "
+            f"{len(P.CAUSAL_FEATURES)} variables that genuinely predict success."
+        )
+        if misplaced:
+            detail += (
+                f" {len(misplaced)} variable{'s' if len(misplaced) != 1 else ''} "
+                "carried positive weight without durable signal behind it."
+            )
+        if against_causal:
+            detail += " Weight was also placed against a genuinely causal variable."
+        if discounted:
+            detail += (
+                f" Marking {len(discounted)} non-causal "
+                f"variable{'s' if len(discounted) != 1 else ''} down cost nothing."
+            )
+
     return {
         "key": "long_term_value",
         "label": "Long-Term Value Creation",
         "score": score,
         "max": 20,
-        "detail": (
-            f"{round(ratio * 100)}% of your total conviction sits on the "
-            f"{len(P.CAUSAL_FEATURES)} variables that genuinely predict success."
-            if total
-            else "No weights were set."
-        ),
+        "detail": detail,
         "components": {
-            "causal_weight": round(causal_weight, 2),
-            "total_weight": round(total, 2),
+            # Retained under their original names: `causal_weight` is still the
+            # numerator and `total_weight` still the denominator, so anything
+            # reading these keeps reading the same two roles.
+            "causal_weight": round(causal_positive, 2),
+            "total_weight": round(denominator, 2),
+            "positive_weight": round(positive_total, 2),
+            "weight_against_causal": round(against_causal, 2),
+            "misplaced_conviction": misplaced,
+            "non_causal_discounted": discounted,
         },
     }
 

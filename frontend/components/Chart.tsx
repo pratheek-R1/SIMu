@@ -18,6 +18,13 @@ const FALLBACKS: Record<string, string> = {
   "--chart-muted": "rgba(255,255,255,.46)",
   "--chart-grid": "rgba(94,234,212,.1)",
   "--chart-axis": "rgba(255,255,255,.55)",
+  // Ordered ramp, dimmest first. For series where the order carries meaning --
+  // cohorts by recency, spend by department -- rather than four unrelated
+  // categories.
+  "--seq-1": "#0f766e",
+  "--seq-2": "#14b8a6",
+  "--seq-3": "#2dd4bf",
+  "--seq-4": "#5eead4",
 };
 
 function token(name: string): string {
@@ -38,7 +45,17 @@ export const COLORS = {
   get RED() { return token("--chart-negative"); },
   get MUTED() { return token("--chart-muted"); },
   get PRIMARY() { return token("--chart-primary"); },
+  get GRID() { return token("--chart-grid"); },
+  get AXIS() { return token("--chart-axis"); },
 };
+
+/** Ordered series ramp, dimmest to brightest. Resolved through `token()` for the
+ *  same reason everything else here is: a canvas context given
+ *  `"rgb(var(--seq-1) / 1)"` rejects the whole declaration and silently keeps
+ *  whatever colour it had, which at the start of a draw is black. */
+export function seqRamp(): string[] {
+  return ["--seq-1", "--seq-2", "--seq-3", "--seq-4"].map(token);
+}
 
 /** Canvas will not resolve `var(--font-mono)` inside a font string -- the whole
  *  declaration fails to parse and the context silently keeps the previous font.

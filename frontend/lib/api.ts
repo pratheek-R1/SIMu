@@ -70,6 +70,7 @@ export const api = {
   post: <T,>(p: string, b?: unknown, o?: { silent?: boolean }) => request<T>("POST", p, b, o),
   put: <T,>(p: string, b?: unknown, o?: { silent?: boolean }) => request<T>("PUT", p, b, o),
   patch: <T,>(p: string, b?: unknown, o?: { silent?: boolean }) => request<T>("PATCH", p, b, o),
+  delete: <T,>(p: string, o?: { silent?: boolean }) => request<T>("DELETE", p, undefined, o),
 };
 
 export function qs(params: Record<string, unknown>): string {
@@ -101,6 +102,9 @@ export interface AppConfig {
   screens: { key: ScreenKey; label: string }[];
   max_thesis_variables: number;
   cheques: number;
+  fund_pool_usd: number;
+  cheque_min_usd: number;
+  cheque_max_usd: number;
 }
 
 export interface User {
@@ -184,6 +188,7 @@ export interface VariableEvidence {
 
 export interface SessionState {
   session_id: string;
+  status: string;
   current_screen: ScreenKey;
   furthest_screen: ScreenKey;
   rail: { key: ScreenKey; label: string; state: "done" | "current" | "pending" }[];
@@ -203,6 +208,69 @@ export interface SessionState {
     median_ltv_cac: number; archive_unlocked: boolean;
     archive_records?: number; combined_records?: number;
   };
+}
+
+export interface SessionSummaryRow {
+  id: string;
+  status: string;
+  current_screen: ScreenKey;
+  total_score: number | null;
+  band: string | null;
+  hits: number | null;
+  created_at: string;
+  furthest_screen: ScreenKey | null;
+  furthest_label: string | null;
+  deployed: boolean;
+  completed_at: string | null;
+  thesis_variables: string[] | null;
+}
+
+export interface ScoreLine {
+  key: string; label: string; score: number; max: number;
+}
+
+export interface SessionHistory {
+  session_id: string;
+  seed: number;
+  dataset_fingerprint: string;
+  status: string;
+  current_screen: ScreenKey;
+  furthest_screen: ScreenKey;
+  furthest_label: string;
+  created_at: string;
+  completed_at: string | null;
+  deployed: boolean;
+  archive_unlocked: boolean;
+  committee_answered: number;
+  committee_total: number;
+  thesis: {
+    locked_at: string | null;
+    variables: { key: string; label: string; confidence: number | null }[];
+    falsification: string | null;
+  } | null;
+  model: {
+    changes: { key: string; label: string; from: number; to: number; moved: number }[];
+    untouched: boolean;
+  } | null;
+  allocation: {
+    deployed: boolean;
+    deployed_at: string | null;
+    positions: { id: number; cheque_usd: number | null; outcome: string | null }[];
+    pool_usd: number;
+    allocated_usd: number | null;
+  } | null;
+  milestones: { at: string; kind: string; label: string; detail: string }[];
+  activity: { key: string; label: string; count: number }[];
+  provenance: { label: string; done: boolean }[];
+  screens_visited: { key: string; label: string; events: number }[];
+  event_count: number;
+  score: {
+    total: number; band: string; max: number;
+    myelin_total: number; myelin_band: string; myelin_max: number;
+    dimensions: ScoreLine[];
+    myelin_dimensions: ScoreLine[];
+  } | null;
+  fund: { hits: number; cheques: number } | null;
 }
 
 export interface Deal extends CompanyRow {

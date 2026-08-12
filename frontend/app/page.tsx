@@ -15,6 +15,8 @@ export default function Landing() {
       <div className="landing-inner">
         <div className="landing-hero">
           <div className="pre">Meridian Partners · Fund IV</div>
+          {/* Hardcoded because this is a static server component with no config
+              fetch. It must track FUND_POOL_USD x INR_RATE -- 50M x 83. */}
           <h1>
             You have five days to deploy <em>₹415 Cr</em>
           </h1>

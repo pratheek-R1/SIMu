@@ -1,6 +1,10 @@
 # Development and CI only. The runtime image installs requirements.txt alone --
 # the test suite drives the ASGI app in-process via httpx.ASGITransport, so it
 # needs no server and nothing here belongs in production.
+#
+# This targets Python 3.12, the version runtime.txt and the deploy images use.
+# On Python 3.14, install requirements-py314.txt instead -- it already includes
+# pytest, so it is a complete local environment on its own.
 -r requirements.txt
 
 pytest==8.3.4

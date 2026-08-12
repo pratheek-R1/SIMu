@@ -21,7 +21,12 @@ export function money(usd: number): string {
   const sign = r < 0 ? "-" : "";
   if (abs >= 1e7) {
     const cr = abs / 1e7;
-    return `${sign}₹${cr >= 100 ? Math.round(cr) : cr.toFixed(1)} Cr`;
+    // A whole number of crore prints without a decimal: "Rs 8 Cr", not
+    // "Rs 8.0 Cr". Every cheque a student can select is a whole number at the
+    // configured rate, and a trailing .0 on all of them made round figures look
+    // like measurements.
+    const shown = cr >= 100 ? Math.round(cr) : Math.round(cr * 10) / 10;
+    return `${sign}₹${Number.isInteger(shown) ? shown : shown.toFixed(1)} Cr`;
   }
   if (abs >= 1e5) return `${sign}₹${(abs / 1e5).toFixed(1)} L`;
   return `${sign}₹${Math.round(abs).toLocaleString("en-IN")}`;

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { initials } from "@/lib/format";
 import { useStore } from "@/lib/store";
+import { IconArrowRight } from "@/components/Icon";
 
 interface Row {
   id: string; status: string; current_screen: string;
@@ -11,7 +13,8 @@ interface Row {
 }
 
 export default function ProfileMenu() {
-  const { user, state, signOut, refreshUser, startSession, loadSession, toast } = useStore();
+  const router = useRouter();
+  const { user, state, signOut, refreshUser, startSession, toast } = useStore();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(user?.name ?? "");
   const [rows, setRows] = useState<Row[]>([]);
@@ -91,28 +94,21 @@ export default function ProfileMenu() {
               </div>
             </div>
 
-            {rows.length > 0 && (
-              <>
-                <div className="eyebrow" style={{ marginBottom: 6 }}>Past sessions</div>
-                <div style={{ marginBottom: 10 }}>
-                  {rows.slice(0, 5).map((r) => (
-                    <div
-                      key={r.id}
-                      className="pd-srow"
-                      style={{ cursor: "pointer" }}
-                      onClick={() => { void loadSession(r.id); setOpen(false); }}
-                    >
-                      <span className="mono" style={{ fontSize: 10, color: "var(--ink-4)" }}>
-                        {new Date(r.created_at).toLocaleDateString()}
-                      </span>
-                      <span className="mono" style={{ fontSize: 11 }}>
-                        {r.total_score != null ? `${r.total_score} · ${r.band}` : r.current_screen}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+            {/* The five-row list that used to live here could show a date and a
+                number and nothing else -- not enough to recognise a run by, let
+                alone review one. The full record has its own route now. */}
+            <button
+              style={{ width: "100%", marginBottom: 8 }}
+              onClick={() => { setOpen(false); router.push("/terminal/history"); }}
+            >
+              Session history
+              {rows.length > 0 && (
+                <span className="mono" style={{ fontSize: 11, color: "var(--ink-4)" }}>
+                  {rows.length}
+                </span>
+              )}
+              <IconArrowRight size={13} />
+            </button>
 
             <button
               style={{ width: "100%", background: "var(--orange)", color: "var(--on-accent)", borderColor: "var(--orange)" }}

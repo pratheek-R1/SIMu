@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CompanyModal from "@/components/CompanyModal";
 import { COLORS, ScatterChart } from "@/components/Chart";
-import { IconArrowRight, IconLock, IconSearch, IconUnlock } from "@/components/Icon";
+import { IconArrowRight, IconSearch } from "@/components/Icon";
 import { api, qs, type CompanyRow } from "@/lib/api";
 import { money, mult, pct } from "@/lib/format";
 import { useStore } from "@/lib/store";
@@ -32,6 +32,10 @@ export default function Research() {
   const [scatter, setScatter] = useState<ScatterData | null>(null);
   const [xAxis, setXAxis] = useState(0);
   const [yAxis, setYAxis] = useState(1);
+  // Pairs already reported this session. The server deduplicates at scoring
+  // time too, so this only avoids pointless repeat POSTs while someone flicks
+  // back and forth through the selects.
+  const reportedPairs = useRef<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     if (!sessionId) return;
@@ -50,6 +54,29 @@ export default function Research() {
     api.get<ScatterData>(`/sessions/${sessionId}/scatter`).then(setScatter).catch(() => {});
   }, [sessionId, state?.archive_unlocked]);
 
+  /* Cross-plotting two continuous metrics is the only way to see the four
+     variables that genuinely predict success, and it was invisible to the
+     server -- so Evidence Depth could not credit it. Reported on change rather
+     than on mount: the default pairing is not something the student chose. */
+  const reportAxes = useCallback(
+    (xi: number, yi: number) => {
+      if (!sessionId || !scatter || xi === yi) return;
+      const kx = scatter.axes[xi]?.key;
+      const ky = scatter.axes[yi]?.key;
+      if (!kx || !ky) return;
+      const pair = [kx, ky].sort().join("|");
+      if (reportedPairs.current.has(pair)) return;
+      reportedPairs.current.add(pair);
+      void api
+        .post(`/sessions/${sessionId}/telemetry/metric`, { x: kx, y: ky })
+        .catch(() => {
+          // Let a failed report be retried rather than silently lost.
+          reportedPairs.current.delete(pair);
+        });
+    },
+    [sessionId, scatter],
+  );
+
   const toggle = (list: string[], set: (v: string[]) => void, value: string) =>
     set(list.includes(value) ? list.filter((x) => x !== value) : [...list, value]);
 
@@ -66,14 +93,11 @@ export default function Research() {
     if (r.notice) toast(r.notice.title, r.notice.message);
   }
 
-  async function requestFailures() {
-    if (!sessionId) return;
-    const r = await api.post<{ granted: boolean; message: string }>(
-      `/sessions/${sessionId}/request-comparison-group`,
-    );
-    toast(r.granted ? "Overlay enabled" : "No comparison group available", r.message);
-    if (r.granted) api.get<ScatterData>(`/sessions/${sessionId}/scatter`).then(setScatter);
-  }
+  /* The "request a comparison group" control has been removed. It read as a
+     button that would reveal withheld failure data, which is the opposite of
+     what it did -- it asked Ops for a comparison group and was refused. The
+     failure overlay still appears on its own once the archive arrives: the
+     scatter refetches on `state.archive_unlocked` below. */
 
   const scatterSeries = useMemo(() => {
     if (!scatter) return [];
@@ -177,17 +201,34 @@ export default function Research() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
           <div className="eyebrow" style={{ marginBottom: 0 }}>Cross-plot</div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <select value={xAxis} onChange={(e) => setXAxis(Number(e.target.value))}>
+            <select
+              value={xAxis}
+              aria-label="Cross-plot X axis metric"
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setXAxis(v);
+                reportAxes(v, yAxis);
+              }}
+            >
               {scatter?.axes.map((a, i) => <option key={a.key} value={i}>{a.label}</option>)}
             </select>
             <span className="note">vs</span>
-            <select value={yAxis} onChange={(e) => setYAxis(Number(e.target.value))}>
+            <select
+              value={yAxis}
+              aria-label="Cross-plot Y axis metric"
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setYAxis(v);
+                reportAxes(xAxis, v);
+              }}
+            >
               {scatter?.axes.map((a, i) => <option key={a.key} value={i}>{a.label}</option>)}
             </select>
-            <button onClick={requestFailures} disabled={!scatter?.failures_locked && scatter?.failures.length !== 0}>
-              {scatter?.failures_locked ? <IconLock size={13} /> : <IconUnlock size={13} />}
-              {scatter?.failures_locked ? "Show failures" : "Failures shown"}
-            </button>
+            {!scatter?.failures_locked && scatter?.failures.length ? (
+              <span className="tag" style={{ background: "rgb(var(--neg-rgb) / 0.12)", color: "var(--neg)" }}>
+                Archive overlay on
+              </span>
+            ) : null}
           </div>
         </div>
         {scatter && (
@@ -206,7 +247,7 @@ export default function Research() {
         )}
         <p className="note" style={{ marginTop: 8 }}>
           {scatter?.failures_locked
-            ? "Portfolio companies only. The failure overlay is not available from this dataset."
+            ? "Portfolio companies only — every company plotted here is one the firm backed. This dataset holds no failures to plot against them."
             : "Hover a point to read it. Click a series in the key to isolate it."}
         </p>
       </div>

@@ -244,8 +244,10 @@ export default function DealFlow() {
           })}
 
           <p className="note" style={{ lineHeight: 1.6, marginTop: 4 }}>
-            Moving one cheque takes the difference from the others, so the fund always totals
-            {" "}{money(pool)}. Any single position above 30% of the fund counts as concentration.
+            Type a figure or drag the slider — either way it settles on the nearest
+            {" "}{money(step)}, the smallest cheque the fund writes. Moving one cheque takes
+            the difference from the others, so the fund always totals {money(pool)}. Any
+            single position above 30% counts as concentration.
           </p>
         </div>
       )}

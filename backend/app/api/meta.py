@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from ..config import settings
 from ..registry import continuous_catalogue, feature_catalogue
 from ..service import SCREEN_LABELS, SCREEN_ORDER
+from ..sim import parameters as P
 
 router = APIRouter(prefix="/meta", tags=["meta"])
 
@@ -26,7 +27,14 @@ async def config() -> dict:
         "continuous_metrics": continuous_catalogue(),
         "screens": [{"key": s, "label": SCREEN_LABELS[s]} for s in SCREEN_ORDER],
         "max_thesis_variables": 4,
-        "cheques": 5,
+        "cheques": P.N_CHEQUES,
+        # The mandate's own numbers. Served rather than hardcoded in the client
+        # for the same reason `inr_rate` is: the brief screen was quoting a
+        # pool figure that only existed as a string in two components, so
+        # changing the pool would have left them both lying.
+        "fund_pool_usd": P.FUND_POOL_USD,
+        "cheque_min_usd": P.CHEQUE_MIN_USD,
+        "cheque_max_usd": P.CHEQUE_MAX_USD,
     }
 
 

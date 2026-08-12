@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChartCanvas, COLORS, MONO } from "@/components/Chart";
+import { ChartCanvas, COLORS, MONO, seqRamp } from "@/components/Chart";
 import { IconCheck, IconClose, IconDash, StarRating } from "@/components/Icon";
 import { api, type CompanyProfile, type CompanyRow, type DeepProfile } from "@/lib/api";
 import { money, months, mult, num, pct } from "@/lib/format";
@@ -626,19 +626,27 @@ function CohortChart({ cohorts, companyId }: { cohorts: number[][]; companyId: n
       const yFor = (v: number) => y1 - ((v - minV) / (maxV - minV)) * (y1 - y0);
       const xFor = (i: number) => x0 + (i / 12) * (x1 - x0);
 
-      ctx.strokeStyle = "rgb(var(--ink-rgb) / 0.2)";
+      /* Every colour here goes through the token helpers. This function used to
+         hand the canvas strings like "rgb(var(--ink-rgb) / 0.25)" -- CSS that a
+         canvas context cannot parse. An unparseable colour is not an error: the
+         context keeps whatever it had, which at the start of a draw is default
+         black. So the guideline, both labels and three of the four cohort lines
+         were being painted black on a near-black ground and were invisible. Only
+         the fourth line, which already used a resolved token, ever showed. */
+      ctx.strokeStyle = COLORS.GRID;
       ctx.setLineDash([3, 3]);
       ctx.beginPath(); ctx.moveTo(x0, yFor(100)); ctx.lineTo(x1, yFor(100)); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = "rgb(var(--ink-rgb) / 0.45)";
+      ctx.fillStyle = COLORS.MUTED;
       ctx.font = `500 9px ${MONO}`;
       ctx.textAlign = "left";
       ctx.fillText("100%", x0, yFor(100) - 4);
 
-      const colors = ["rgb(var(--ink-rgb) / 0.25)", "rgb(var(--ink-rgb) / 0.45)", "rgb(var(--ink-rgb) / 0.7)", COLORS.ORANGE];
+      // Dimmest to brightest, so recency reads off the ramp in either theme.
+      const colors = seqRamp();
       cohorts.forEach((curve, ci) => {
         ctx.strokeStyle = colors[ci % colors.length];
-        ctx.lineWidth = 1.6;
+        ctx.lineWidth = 1.8;
         ctx.beginPath();
         curve.forEach((v, i) => {
           const x = xFor(i), y = yFor(v);
@@ -647,9 +655,12 @@ function CohortChart({ cohorts, companyId }: { cohorts: number[][]; companyId: n
         ctx.stroke();
       });
 
-      ctx.fillStyle = "rgb(var(--ink-rgb) / 0.45)";
+      ctx.fillStyle = COLORS.MUTED;
       ctx.textAlign = "center";
-      ctx.fillText("Months since acquisition — four quarterly cohorts, darkest is most recent", w / 2, h - 4);
+      ctx.fillText(
+        "Months since acquisition — four quarterly cohorts, brightest is most recent",
+        w / 2, h - 4,
+      );
     },
     [cohorts],
   );

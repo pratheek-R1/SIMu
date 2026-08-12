@@ -56,6 +56,15 @@ class Settings(BaseSettings):
 
     # Currency. The prototype hardcoded 83 inside profile.js; it is config here
     # so a deployment can change it without a code change.
+    #
+    # Note the consequence for cheque sizing: cheques are stored in USD and must
+    # be whole millions (`CHEQUE_STEP_USD`), so at 83 the slider step is Rs 8.3 Cr
+    # and no selectable cheque is ever a round number of crore -- the values run
+    # 16.6, 24.9, 33.2, 41.5 and so on. A rate of 80 would make every step land on
+    # a whole number, at the cost of the pool reading Rs 400 Cr instead of
+    # Rs 415 Cr. The Rs 415 Cr headline was kept deliberately; the two cannot both
+    # be true, because at 83 the only round-crore amounts that are also whole USD
+    # are multiples of 83 Cr.
     inr_rate: float = 83.0
 
     # Every cohort gets its own seed. Reusing a seed across semesters means the
