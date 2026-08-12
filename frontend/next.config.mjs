@@ -25,6 +25,11 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: resolveApiUrl(),
   },
+  // Next's dev tools badge sits in the bottom-left corner, on top of the
+  // terminal's own chrome, which gets in the way of checking layout. It is a
+  // development-only overlay and never present in a production build, so this
+  // only affects `next dev`. Set to `{}` (or remove the line) to bring it back.
+  devIndicators: false,
 };
 
 export default nextConfig;
