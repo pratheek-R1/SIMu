@@ -36,21 +36,11 @@ export default function Thesis() {
     }
   }
 
-  /** Clicking the locked win-rate bar.
-   *
-   *  This is the behavioural signal the Provenance dimension scores. The
-   *  student is looking at a number they cannot compute and asking for the
-   *  half of the data that would let them compute it. Asking before the
-   *  archive arrives is the thing being measured; the request is refused,
-   *  which is the honest answer. */
-  async function requestComparisonGroup() {
-    if (!sessionId) return;
-    const r = await api.post<{ granted: boolean; message: string }>(
-      `/sessions/${sessionId}/request-comparison-group`,
-    );
-    toast(r.granted ? "Comparison group available" : "No comparison group", r.message);
-    if (r.granted) await loadEvidence();
-  }
+  /* The win-rate row used to carry a "Needs a comparison group" button that
+     asked Ops for the failures and was refused. Clicking it could only ever
+     produce the same rejection toast, so it read as a dead control. The row is
+     still shown locked -- that absence is the point of the screen -- but it is
+     now a static indicator rather than something to press. */
 
   async function lock() {
     if (!sessionId) return;
@@ -156,13 +146,10 @@ export default function Thesis() {
                         <div className="lockbar">
                           <div className="metric-row">
                             <span className="ml">Success rate with this trait</span>
-                            <button
-                              onClick={requestComparisonGroup}
-                              style={{ padding: "3px 9px", fontSize: 10.5, borderRadius: 5 }}
-                            >
+                            <span className="ml-locked mono">
                               <IconLock size={11} />
-                              Needs a comparison group
-                            </button>
+                              Not available
+                            </span>
                           </div>
                           <div className="locked" />
                         </div>

@@ -1651,3 +1651,16 @@ input[type="range"].green-slider::-moz-range-thumb { background: var(--green); }
    element+attribute selector outranks a bare class, so `.my-input { width: 62px }`
    loses to it and the field renders full-bleed. Use `input.my-input` if you need
    to win that fight. */
+
+
+/* The locked win-rate marker on the thesis screen. A static label, not a
+   button: there is nothing to press, because the failures genuinely are not in
+   this dataset. The row stays visible so the missing number is legible. */
+.ml-locked {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 500; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-5); white-space: nowrap;
+}
+
+
+
