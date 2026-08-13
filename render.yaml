@@ -1,10 +1,15 @@
-# Render blueprint -- provisions the whole stack from this repo.
+# Render blueprint -- API, database and cache.
 #
 #   Render Dashboard -> New -> Blueprint -> pick this repo.
 #
-# Everything below is on the free tier so a cohort can be stood up without a
-# card. Read DEPLOY.md before a real teaching deployment: free Postgres is
-# deleted after 30 days and free web services sleep after 15 minutes idle.
+# The Next.js frontend is NOT defined here: it is deployed on Vercel, whose root
+# directory is set to `frontend/`. That split is why CORS_ORIGINS is `sync: false`
+# below rather than a service reference -- Render cannot resolve a Vercel
+# hostname, so it is set by hand in the dashboard once the Vercel URL exists.
+#
+# Everything is on the free tier so a cohort can be stood up without a card.
+# Free Postgres is deleted 30 days after creation and free web services sleep
+# after 15 minutes idle.
 
 databases:
   - name: survivors-db
@@ -51,12 +56,12 @@ services:
           property: connectionString
       - key: CACHE_TTL_SECONDS
         value: "3600"
-      # Render hands back a bare hostname; config.py prefixes it with https://.
+      # Set this in the Render dashboard to your Vercel domain once the frontend
+      # is deployed, e.g. `simu.vercel.app`. A bare hostname is fine -- config.py
+      # prefixes https://. Comma-separate to allow preview deployments too.
+      # Until it is set, the browser will block every API call with a CORS error.
       - key: CORS_ORIGINS
-        fromService:
-          type: web
-          name: survivors-web
-          property: host
+        sync: false
       - key: INR_RATE
         value: "83"
       - key: DELIBERATION_SECONDS
@@ -65,28 +70,6 @@ services:
       # means the reveal is common knowledge before the second intake.
       - key: DEFAULT_COHORT_SEED
         value: "20260729"
-
-  # ---------------------------------------------------------------------------
-  # Next.js terminal UI.
-  # ---------------------------------------------------------------------------
-  - type: web
-    name: survivors-web
-    runtime: node
-    plan: free
-    rootDir: frontend
-    buildCommand: npm ci && npm run build
-    startCommand: npm run start
-    autoDeployTrigger: commit
-    envVars:
-      - key: NODE_VERSION
-        value: "22.11.0"
-      # NEXT_PUBLIC_API_URL is inlined at build time by next.config.mjs, which
-      # turns this bare host into an https:// origin.
-      - key: NEXT_PUBLIC_API_HOST
-        fromService:
-          type: web
-          name: survivors-api
-          property: host
 
   # ---------------------------------------------------------------------------
   # Cache. Values are all derived from the cohort seed and immutable for its
